@@ -95,7 +95,6 @@ void
 run_benchmark(int (*reduce)(float*, float*, int, int), 
               float *d_outPtr, float *d_inPtr, int size)
 {
-    cudaEvent_t start, stop;
     int num_threads = 256;
     int test_iter = 100;
 

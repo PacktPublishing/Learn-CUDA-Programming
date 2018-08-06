@@ -1,5 +1,4 @@
-CUDA_PATH=${CUDA_ROOT}
-# CUDA_PATH=/usr/local/cuda
+CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
 TARGET=sgemm
@@ -15,7 +14,7 @@ all: ${TARGET}
 
 # SEGMM
 sgemm: sgemm.cu
-	$(EXEC) $(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+	$(EXEC) $(NVCC) $(INCLUDES) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 clean:
 	rm -f ${TARGET} *.o
