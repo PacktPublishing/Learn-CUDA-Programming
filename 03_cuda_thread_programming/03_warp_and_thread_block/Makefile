@@ -3,7 +3,7 @@ HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
 
 INCLUDES= -I${CUDA_PATH}/samples/common/inc
-NVCC_FLAGS=-m64
+NVCC_FLAGS=-m64 -lineinfo
 
 # Gencode argumentes
 SMS = 30 35 37 50 52 60 61 70
