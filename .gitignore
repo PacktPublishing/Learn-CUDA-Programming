@@ -11,5 +11,6 @@
 
 *.o
 *.nvvp
+.DS_Store
 
 !Makefile
