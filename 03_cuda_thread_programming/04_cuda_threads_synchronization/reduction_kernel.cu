@@ -23,10 +23,11 @@ reduction_kernel(float* d_out, float* d_in, unsigned int size)
     // do reduction
     for (unsigned int stride = 1; stride < blockDim.x; stride *= 2)
     {
-        //if ( (idx_x % (stride * 2)) == 0 ) {
-        if ( (idx_x & (stride * 2 - 1)) == 0 ) {
+        // thread synchronous reduction
+        // you may want to try for this condition::
+        //  if ( (idx_x & (stride * 2 - 1)) == 0 ) 
+        if ( (idx_x % (stride * 2)) == 0 ) 
             s_data[threadIdx.x] += s_data[threadIdx.x + stride];
-        }
             
         __syncthreads();
     }

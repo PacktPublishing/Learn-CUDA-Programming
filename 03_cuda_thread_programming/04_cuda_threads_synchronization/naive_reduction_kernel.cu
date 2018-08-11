@@ -27,8 +27,9 @@ atomic_reduction_kernel(float *data_out, float *data_in, int size)
     atomicAdd(&data_out[0], data_in[idx_x]);
 }
 
-void atomic_reduction(float *d_out, float *d_in, int size, int n_blocks, int n_threads)
+void atomic_reduction(float *d_out, float *d_in, int n_threads, int size)
 {
+    int n_blocks = (size + n_threads - 1) / n_threads;
     atomic_reduction_kernel<<<n_blocks, n_threads>>>(d_out, d_in, size);
 }
 

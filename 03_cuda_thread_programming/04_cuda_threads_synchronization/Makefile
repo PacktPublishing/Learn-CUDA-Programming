@@ -1,7 +1,7 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=reduction conditional_sync
+TARGET=conditional_sync reduction naive_reduction
 
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 # --resource-usage
@@ -16,9 +16,15 @@ ALL_CCFLAGS +=
 
 all : ${TARGET}
 
-# reduction
+
 naive_reduction_kernel.o: naive_reduction_kernel.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+naive_reduction.o: naive_reduction.cpp
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+naive_reduction: naive_reduction.o naive_reduction_kernel.o
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 reduction_kernel.o: reduction_kernel.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
@@ -26,7 +32,7 @@ reduction_kernel.o: reduction_kernel.cu
 reduction.o: reduction.cpp
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-reduction: reduction.o reduction_kernel.o naive_reduction_kernel.o
+reduction: reduction.o reduction_kernel.o
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 # warp instruction

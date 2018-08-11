@@ -6,5 +6,6 @@ void reduction(float *d_out, float *d_in, int n_threads, int size);
 
 // @naive_reduction_kernel.cu
 void naive_reduction(float *d_out, float *d_in, int n_threads, int size);
+void atomic_reduction(float *d_out, float *d_in, int n_threads, int size);
 
 #endif // _REDUCTION_H_

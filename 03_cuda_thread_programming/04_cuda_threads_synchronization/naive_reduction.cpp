@@ -3,10 +3,11 @@
 
 // cuda runtime
 #include <cuda_runtime.h>
+#include <helper_timer.h>
 
 #include "reduction.h"
 
-void run_benchmark(void (*reduce)(float *, float *, int, int, int),
+void run_benchmark(void (*reduce)(float *, float *, int, int),
                    float *d_outPtr, float *d_inPtr, int size);
 void init_input(float *data, int size);
 float get_cpu_result(float *data, int size);
@@ -22,22 +23,6 @@ int main(int argc, char *argv[])
     unsigned int size = 1 << 24;
 
     float result_host, result_gpu;
-    int mode = -1;
-
-    if (argc > 1)
-    {
-        mode = atoi(argv[1]);
-        if (mode < 0 || mode > 2)
-        {
-            puts("Invalid reduction request!! 0-2 are avaiable.");
-            exit(EXIT_FAILURE);
-        }
-    }
-    else
-    {
-        puts("Please put operation option!! 0-2 are avaiable.");
-        exit(EXIT_FAILURE);
-    }
 
     srand(2019);
 
@@ -54,14 +39,7 @@ int main(int argc, char *argv[])
     cudaMemcpy(d_inPtr, h_inPtr, size * sizeof(float), cudaMemcpyHostToDevice);
 
     // Get reduction result from GPU
-    switch (mode) {
-        case 0:
-            run_benchmark(fault_reduction, d_outPtr, d_inPtr, size);
-            break;
-        case 1:
-            run_benchmark(atomic_reduction, d_outPtr, d_inPtr, size);
-            break;
-    }
+    run_benchmark(naive_reduction, d_outPtr, d_inPtr, size);
     cudaMemcpy(&result_gpu, &d_outPtr[0], sizeof(float), cudaMemcpyDeviceToHost);
 
     // Get reduction result from GPU
@@ -78,29 +56,19 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void run_reduction(void (*reduce)(float *, float *, int, int, int),
-                   float *d_outPtr, float *d_inPtr, int size, int n_threads)
-{
-    int n_blocks = (size + n_threads - 1) / n_threads;
-    reduce(d_outPtr, d_inPtr, size, n_blocks, n_threads);
-    cudaDeviceSynchronize();
-}
-
-void run_benchmark(void (*reduce)(float *, float *, int, int, int),
+void run_benchmark(void (*reduce)(float *, float *, int, int),
                    float *d_outPtr, float *d_inPtr, int size)
 {
     int num_threads = 256;
     int test_iter = 100;
 
-    // Allocate CUDA events that we'll use for timing
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-
     // warm-up
-    reduce(d_outPtr, d_inPtr, size, size / num_threads, num_threads);
+    reduce(d_outPtr, d_inPtr, num_threads, size);
 
-    // Record the start event
-    cudaEventRecord(start, NULL);
+    // initialize timer
+    StopWatchInterface *timer;
+    sdkCreateTimer(&timer);
+    sdkStartTimer(&timer);
 
     ////////
     // Operation body
@@ -108,28 +76,20 @@ void run_benchmark(void (*reduce)(float *, float *, int, int, int),
     for (int i = 0; i < test_iter; i++)
     {
         cudaMemcpy(d_outPtr, d_inPtr, size * sizeof(float), cudaMemcpyDeviceToDevice);
-        run_reduction(reduce, d_outPtr, d_outPtr, size, num_threads);
+        reduce(d_outPtr, d_outPtr, num_threads, size);
+        cudaDeviceSynchronize();
     }
 
-    // Record the stop event
-    cudaEventRecord(stop, NULL);
-
-    // Wait for the stop event to complete
-    cudaEventSynchronize(stop);
-
-    float msecTotal = 0.0f;
-    cudaEventElapsedTime(&msecTotal, start, stop);
-    msecTotal /= (float)test_iter;
+    // getting elapsed time
+    cudaDeviceSynchronize();
+    sdkStopTimer(&timer);
 
     // Compute and print the performance
-    float bandwidth = size * sizeof(float) / msecTotal / 1e6;
+    float elapsed_time_msed = sdkGetTimerValue(&timer) / (float)test_iter;
+    float bandwidth = size * sizeof(float) / elapsed_time_msed / 1e6;
+    printf("Time= %.3f msec, bandwidth= %f GB/s\n", elapsed_time_msed, bandwidth);
 
-    printf(
-        "Time= %.3f msec, bandwidth= %f GB/s\n",
-        msecTotal, bandwidth / msecTotal);
-
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    sdkDeleteTimer(&timer);
 }
 
 void init_input(float *data, int size)

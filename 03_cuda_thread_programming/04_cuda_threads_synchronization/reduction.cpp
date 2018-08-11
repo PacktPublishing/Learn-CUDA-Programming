@@ -23,22 +23,6 @@ int main(int argc, char *argv[])
     unsigned int size = 1 << 24;
 
     float result_host, result_gpu;
-    int mode = -1;
-
-    if (argc > 1)
-    {
-        mode = atoi(argv[1]);
-        if (mode < 0 || mode > 1)
-        {
-            puts("Invalid reduction request!! 0-1 are avaiable.");
-            exit(EXIT_FAILURE);
-        }
-    }
-    else
-    {
-        puts("Please put operation option!! 0-1 are avaiable.");
-        exit(EXIT_FAILURE);
-    }
 
     srand(2019);
 
@@ -55,15 +39,7 @@ int main(int argc, char *argv[])
     cudaMemcpy(d_inPtr, h_inPtr, size * sizeof(float), cudaMemcpyHostToDevice);
 
     // Get reduction result from GPU
-    switch (mode)
-    {
-    case 0:
-        run_benchmark(naive_reduction, d_outPtr, d_inPtr, size);
-        break;
-    case 1:
-        run_benchmark(reduction, d_outPtr, d_inPtr, size);
-        break;
-    }
+    run_benchmark(reduction, d_outPtr, d_inPtr, size);
     cudaMemcpy(&result_gpu, &d_outPtr[0], sizeof(float), cudaMemcpyDeviceToHost);
 
     // Get reduction result from GPU
