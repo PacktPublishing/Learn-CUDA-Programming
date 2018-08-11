@@ -49,13 +49,13 @@ __inline__ __device__ float block_reduce_sum(float val)
 __global__ void
 reduction_kernel(float *g_out, float *g_in, unsigned int size)
 {
-    unsigned int idx_x = blockIdx.x * (2 * blockDim.x) + threadIdx.x;
+    unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
 
     // cumulates input with grid-stride loop and save to share memory
     float sum = 0.f;
     for (int i = idx_x; i < size; i += blockDim.x * gridDim.x)
         sum += g_in[i];
-
+    // warp synchronous reduction
     sum = block_reduce_sum(sum);
 
     if (threadIdx.x == 0)

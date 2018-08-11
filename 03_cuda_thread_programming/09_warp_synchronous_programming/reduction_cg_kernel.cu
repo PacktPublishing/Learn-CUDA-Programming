@@ -17,11 +17,11 @@ using namespace cooperative_groups;
     https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
  */
 
-template <unsigned size>
-__inline__ __device__ float tile_reduce_sum(thread_block_tile<size> tile, float val)
+template <typename group_t>
+__inline__ __device__ float warp_reduce_sum(group_t group, float val)
 {
-    for (int offset = tile.size() / 2; offset > 0; offset >>= 1)
-         val += tile.shfl_down(val, offset);
+    for (int offset = group.size() / 2; offset > 0; offset >>= 1)
+         val += group.shfl_down(val, offset);
     return val;
 }
 
@@ -32,7 +32,7 @@ __inline__ __device__ float block_reduce_sum(thread_block block, float val)
 
     // partial reduciton at tile<32> size
     thread_block_tile<32> tile32 = tiled_partition<32>(block);
-    val = tile_reduce_sum(tile32, val);
+    val = warp_reduce_sum(tile32, val);
 
     // write reduced value to shared memory
     if (tile32.thread_rank() == 0)
@@ -43,7 +43,7 @@ __inline__ __device__ float block_reduce_sum(thread_block block, float val)
     //read from shared memory only if that warp existed
     if (warp_idx == 0) {
         val = (threadIdx.x < blockDim.x / warpSize) ? shared[tile32.thread_rank()] : 0;
-        val = tile_reduce_sum(tile32, val); //Final reduce within first warp
+        val = warp_reduce_sum(tile32, val); //Final reduce within first warp
     }
 
     return val;
@@ -54,13 +54,13 @@ __global__ void
 reduction_kernel(float *g_out, float *g_in, unsigned int size)
 {
     thread_block block = this_thread_block();
-    unsigned int idx_x = blockIdx.x * (2 * blockDim.x) + threadIdx.x;
+    unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
     
     // cumulates input with grid-stride loop and save to share memory
     float sum = 0.f;
     for (int i = idx_x; i < size; i += blockDim.x * gridDim.x)
         sum += g_in[i];
-
+    // warp synchronous reduction
     sum = block_reduce_sum(block, sum);
 
     if (block.thread_index().x == 0)
