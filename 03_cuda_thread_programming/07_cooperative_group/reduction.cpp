@@ -60,9 +60,7 @@ void
 run_reduction(int (*reduce)(float*, float*, int, int), 
               float *d_outPtr, float *d_inPtr, int size, int n_threads)
 {
-    while(size > 1) {
-        size = reduce(d_outPtr, d_inPtr, size, n_threads);
-    }
+    reduce(d_outPtr, d_inPtr, size, n_threads);
 }
 
 void
