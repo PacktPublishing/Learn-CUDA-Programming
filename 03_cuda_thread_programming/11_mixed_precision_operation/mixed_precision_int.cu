@@ -43,6 +43,9 @@ __device__ unsigned int __dp2a_hi(ushort2 srcA, uchar4 srcB, unsigned int c);
 
 using namespace cooperative_groups;
 
+// FMA numerical arithmetic function in GPU @INT8
+// y = x * y + z
+// in this kernel, assuming we have transposed matrix y
 __global__ void dp4a_kernel(char *d_x, char *d_y, int *d_z, int height, int width)
 {
     grid_group grid = this_grid();
@@ -58,24 +61,36 @@ __global__ void dp4a_kernel(char *d_x, char *d_y, int *d_z, int height, int widt
     char4 *quad_y = (char4 *)d_y;
     
     int sum = 0;
-    for (int i = 0; i < quater_size; i++) {
+    for (int i = 0; i < quater_size; i++)
         sum += __dp4a(quad_y[idx_y * quater_size + i], quad_x[idx_y * quater_size + i], 0);
-    }
-    d_z[idx_y * width + idx_x] = sum;
 #else
     int sum = 0;
-    for (int i = 0; i < width; i++ ) {
+    for (int i = 0; i < width; i++ )
         sum += d_y[idx_y * width + i] * d_x[idx_y * width + i];
-    }
 #endif
+    d_z[idx_y * width + idx_x] = sum;
+}
+
+void matmul_host(char *h_x, char *h_y, int *h_z, int height, int width)
+{
+    #pragma omp parallel
+    for (int idx_y = 0; idx_y < height; idx_y++) {
+        for (int idx_x = 0; idx_x < width; idx_x++) {
+            float sum = 0.f;
+            for (int i = 0; i < width; i++)
+                sum += h_y[idx_y * width + i] * h_x[idx_y * width + i];
+
+            h_z[idx_y * width + idx_x] = sum;
+        }
+    }
 }
 
 int main()
 {
     CBuffer<char> X, Y;
     CBuffer<int> Z;
-    int height = 1 << 12;
-    int width = 1 << 12;
+    int height = 1 << 10;
+    int width = 1 << 10;
     int size = height * width;
     int n_iteration = 100;
 
@@ -87,9 +102,9 @@ int main()
     Z.init(size);
 
     // initalize gpu buffers
-    X.cuda(true);
-    Y.cuda(true);
-    Z.cuda(false);
+    X.cuda();
+    Y.cuda();
+    Z.cuda();
 
     // convert x and y from float type to half type
     dim3 dimBlock(64, 8);
@@ -113,6 +128,11 @@ int main()
     float elapsedTimeMs = sdkGetTimerValue(&timer) / (float)n_iteration;
     float throughput = 3 * 2.f * size / elapsedTimeMs;
     printf("FMA, Throughput = %.3f GFlops, Operation Time= %.3f msec\n", throughput * 1e-6, elapsedTimeMs);
+
+    matmul_host(X.h_ptr_, Y.h_ptr_, Z.h_ptr_, height, width);
+
+    int diff_count = Z.diff_count();
+    (diff_count == 0) ? printf("Success!!\n") : printf("Counted diff!! (%d times)\n", diff_count);
 
     // cleanup
     sdkDeleteTimer(&timer);

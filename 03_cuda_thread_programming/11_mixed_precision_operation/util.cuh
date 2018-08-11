@@ -1,6 +1,9 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <cstdio>
+#include <cfloat>
+
 template <typename T>
 class CBuffer
 {
@@ -36,11 +39,15 @@ class CBuffer
         if (do_fill == true)
         {
             for (int i = 0; i < size_; i++)
-                h_ptr_[i] = (rand() & 0xFF) / (float)RAND_MAX;
+                if (sizeof(T) >= 2)    
+                    h_ptr_[i] = .1f * rand() / (float)RAND_MAX;
+                else
+                    h_ptr_[i] = rand() % 10;
+
         }
     }
 
-    int cuda(bool do_copy = false)
+    int cuda(bool do_copy = true)
     {
         if (d_ptr_ != NULL)
             return 1;
@@ -61,6 +68,27 @@ class CBuffer
     void copyToHost()
     {
         cudaMemcpy(h_ptr_, d_ptr_, size_ * sizeof(T), cudaMemcpyDeviceToHost);
+    }
+
+    int diff_count()
+    {
+        int diff_count = 0;
+
+        if (h_ptr_ == NULL || d_ptr_ == NULL)
+            return -1;
+
+        T *temp_ptr = (T *)new T[size_];
+        cudaMemcpy(temp_ptr, d_ptr_, size_ * sizeof(T), cudaMemcpyDeviceToHost);
+        
+        #pragma omp parallel
+        for (int i = 0; i < size_; i++) {
+            if (fabs(temp_ptr[i] - h_ptr_[i]) > 0.0001)
+                diff_count++;
+        }
+
+        cudaFree(temp_ptr);
+
+        return diff_count;
     }
 };
 

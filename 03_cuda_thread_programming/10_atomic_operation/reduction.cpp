@@ -7,7 +7,7 @@
 
 #include "reduction.h"
 
-void run_benchmark(int (*reduce)(float*, float*, int, int), 
+void run_benchmark(void (*reduce)(float*, float*, int, int), 
                    float *d_outPtr, float *d_inPtr, int size);
 void init_input(float* data, int size);
 float get_cpu_result(float *data, int size);
@@ -67,18 +67,13 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void
-run_reduction(int (*reduce)(float*, float*, int, int), 
+void run_reduction(void (*reduce)(float*, float*, int, int), 
               float *d_outPtr, float *d_inPtr, int size, int n_threads)
 {
-    // Thus, we will use atomic call, we design a single kernel call.
-    //while(size > 1) {
-        size = reduce(d_outPtr, d_inPtr, size, n_threads);
-    //}
+    reduce(d_outPtr, d_inPtr, size, n_threads);
 }
 
-void
-run_benchmark(int (*reduce)(float*, float*, int, int), 
+void run_benchmark(void (*reduce)(float*, float*, int, int), 
               float *d_outPtr, float *d_inPtr, int size)
 {
     int num_threads = 256;

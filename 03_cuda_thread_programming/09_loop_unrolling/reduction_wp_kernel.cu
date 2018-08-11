@@ -22,11 +22,9 @@ using namespace cooperative_groups;
 
 __inline__ __device__ float warp_reduce_sum(float val)
 {
-    val += __shfl_down_sync(FULL_MASK, val, warpSize >> 1);  // 16
-    val += __shfl_down_sync(FULL_MASK, val, warpSize >> 2);  // 8
-    val += __shfl_down_sync(FULL_MASK, val, warpSize >> 3);  // 4
-    val += __shfl_down_sync(FULL_MASK, val, warpSize >> 4);  // 2
-    val += __shfl_down_sync(FULL_MASK, val, warpSize >> 5);  // 1
+    #pragma unroll
+    for (int offset = 1; offset < 6; offset++)
+          val += __shfl_down_sync(FULL_MASK, val, warpSize >> offset);  // (16 --> 1)
 
     return val;
 }
@@ -45,10 +43,10 @@ __inline__ __device__ float block_reduce_sum(float val)
     __syncthreads(); // Wait for all partial reductions
 
     //read from shared memory only if that warp existed
-    val = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
-
-    if (wid == 0)
+    if (wid == 0) {
+        val = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
         val = warp_reduce_sum(val); //Final reduce within first warp
+    }
 
     return val;
 }
@@ -68,9 +66,8 @@ reduction_kernel(float* g_out, float* g_in, unsigned int size)
 
     sum = block_reduce_sum(sum);
 
-    if (block.thread_rank() == 0) {
-        g_out[blockIdx.x] = sum;
-    }
+    if (block.thread_index().x == 0)
+        g_out[block.group_index().x] = sum;
 }
 
 int reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
