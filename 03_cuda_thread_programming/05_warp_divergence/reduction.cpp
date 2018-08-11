@@ -11,6 +11,11 @@ void run_benchmark(int (*reduce)(float*, float*, int, int),
                    float *d_outPtr, float *d_inPtr, int size);
 void init_input(float* data, int size);
 float get_cpu_result(float *data, int size);
+void message()
+{
+    puts("Invalid reduction request!! 0-1 are avaiable.");
+    exit(EXIT_FAILURE);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Program main
@@ -28,15 +33,11 @@ main(int argc, char *argv[])
 
     if (argc > 1) {
         mode = atoi(argv[1]);
-        if (mode < 0 || mode > 2) {
-            puts("Invalid reduction request!! 0-2 are avaiable.");
-            exit(EXIT_FAILURE);
-        }
+        if (mode < 0 || mode > 1)
+            message();
     }
-    else
-    {
-        puts("Please put operation option!! 0-2 are avaiable.");
-        exit(EXIT_FAILURE);
+    else {
+        message();
     }
 
     srand(2019);
@@ -57,12 +58,13 @@ main(int argc, char *argv[])
     switch (mode)
     {
         case 0:
+            printf("interleave addressing\n");
             run_benchmark(reduction_1, d_outPtr, d_inPtr, size); break;
         case 1:
+            printf("sequential addressing\n");
             run_benchmark(reduction_2, d_outPtr, d_inPtr, size); break;
         default:
-            puts("Unexpeced reduction request!!");
-            exit(EXIT_FAILURE);
+            message();
     }
     cudaMemcpy(&result_gpu, &d_outPtr[0], sizeof(float), cudaMemcpyDeviceToHost);
 
