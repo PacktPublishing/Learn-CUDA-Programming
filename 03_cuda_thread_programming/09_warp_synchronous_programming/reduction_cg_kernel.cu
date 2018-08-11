@@ -56,10 +56,10 @@ reduction_kernel(float *g_out, float *g_in, unsigned int size)
     thread_block block = this_thread_block();
     unsigned int idx_x = blockIdx.x * (2 * blockDim.x) + threadIdx.x;
     
+    // cumulates input with grid-stride loop and save to share memory
     float sum = 0.f;
-    // reduce one more data
-    sum += (idx_x < size) ? g_in[idx_x] : 0.f;
-    sum += ((idx_x + block.size()) < size) ? g_in[idx_x + block.size()] : 0.f;
+    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x)
+        sum += g_in[i];
 
     sum = block_reduce_sum(block, sum);
 
@@ -67,10 +67,14 @@ reduction_kernel(float *g_out, float *g_in, unsigned int size)
         g_out[block.group_index().x] = sum;
 }
 
-int reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
+void reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
 {
-    int block_size = 2 * n_threads;
-    int n_blocks = (size + block_size - 1) / block_size;
+    int num_sms;
+    int num_blocks_per_sm;
+    cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, 0);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&num_blocks_per_sm, reduction_kernel, n_threads, n_threads*sizeof(float));
+    int n_blocks = min(num_blocks_per_sm * num_sms, (size + n_threads - 1) / n_threads);
+
     reduction_kernel<<<n_blocks, n_threads>>>(g_outPtr, g_inPtr, size);
-    return n_blocks;
+    reduction_kernel<<< 1, n_threads >>>(g_outPtr, g_inPtr, n_blocks);
 }
