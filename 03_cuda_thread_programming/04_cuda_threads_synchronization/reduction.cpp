@@ -74,9 +74,7 @@ void run_benchmark(void (*reduce)(float*, float*, int, int),
     // Operation body
     ////////
     for (int i = 0; i < test_iter; i++) {
-        cudaMemcpy(d_outPtr, d_inPtr, size * sizeof(float), cudaMemcpyDeviceToDevice);
-        reduce(d_outPtr, d_outPtr, num_threads, size);
-        cudaDeviceSynchronize();
+        reduce(d_outPtr, d_inPtr, num_threads, size);
     }
 
     // getting elapsed time

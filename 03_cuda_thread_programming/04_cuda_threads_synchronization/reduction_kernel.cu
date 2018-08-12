@@ -38,10 +38,11 @@ reduction_kernel(float* d_out, float* d_in, unsigned int size)
 
 void reduction(float *d_out, float *d_in, int n_threads, int size)
 {   
+    cudaMemcpy(d_out, d_in, size * sizeof(float), cudaMemcpyDeviceToDevice);
     while(size > 1)
     {
         int n_blocks = (size + n_threads - 1) / n_threads;
-        reduction_kernel<<< n_blocks, n_threads, n_threads * sizeof(float), 0 >>>(d_out, d_in, size);
+        reduction_kernel<<< n_blocks, n_threads, n_threads * sizeof(float), 0 >>>(d_out, d_out, size);
         size = n_blocks;
     } 
 }
