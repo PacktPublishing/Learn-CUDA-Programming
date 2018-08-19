@@ -40,13 +40,6 @@ __global__ void hfma_kernel(half *d_x, half *d_y, float *d_z, int height, int wi
     d_z[idx_y * width + idx_x] = sum;
 }
 
-__global__ void float2half_kernel(half *d_out, float *d_in)
-{
-    grid_group grid = this_grid();
-
-    d_out[grid.thread_rank()] = __float2half(d_in[grid.thread_rank()]);
-}
-
 void matmul_host(half *h_x, half *h_y, float *h_z, int height, int width)
 {
     #pragma omp parallel
