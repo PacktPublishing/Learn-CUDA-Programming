@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "reduction.h"
 
-#define FULL_MASK 0xffffffff
+#define NUM_LOAD 4
 
 /*
     Parallel sum reduction using shared memory
@@ -18,8 +18,10 @@
 
 __inline__ __device__ float warp_reduce_sum(float val)
 {
-    for (int offset = warpSize / 2; offset > 0; offset >>= 1)
-        val += __shfl_down_sync(FULL_MASK, val, offset);
+    for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
+        unsigned int mask = __activemask();
+        val += __shfl_down_sync(mask, val, offset);
+    }
     return val;
 }
 
@@ -52,14 +54,19 @@ reduction_kernel(float *g_out, float *g_in, unsigned int size)
     unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
 
     // cumulates input with grid-stride loop and save to share memory
-    float sum = 0.f;
-    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x)
-        sum += g_in[i];
+    float sum[NUM_LOAD] = { 0.f };
+    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x * NUM_LOAD)
+    {
+        for (int step = 0; step < NUM_LOAD; step++)
+            sum[step] += (i + step * blockDim.x * gridDim.x < size) ? g_in[i + step * blockDim.x * gridDim.x] : 0.f;
+    }
+    for (int i = 1; i < NUM_LOAD; i++)
+        sum[0] += sum[i];
     // warp synchronous reduction
-    sum = block_reduce_sum(sum);
+    sum[0] = block_reduce_sum(sum[0]);
 
     if (threadIdx.x == 0)
-        g_out[blockIdx.x] = sum;
+        g_out[blockIdx.x] = sum[0];
 }
 
 void reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
