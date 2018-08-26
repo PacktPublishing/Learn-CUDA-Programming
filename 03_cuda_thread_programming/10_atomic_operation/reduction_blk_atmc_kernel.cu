@@ -2,10 +2,9 @@
 #include <cooperative_groups.h>
 #include "reduction.h"
 
-//namespace cg = cooperative_groups;
 using namespace cooperative_groups;
 
-#define FULL_MASK 0xffffffff
+#define NUM_LOAD 4
 
 /*
     Parallel sum reduction using shared memory
@@ -63,18 +62,23 @@ reduction_blk_atmc_kernel(float *g_out, float *g_in, unsigned int size)
     thread_block block = this_thread_block();
 
     // cumulates input with grid-stride loop and save to share memory
-    float sum = 0.f;
-    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x)
-        sum += g_in[i];
+    float sum[NUM_LOAD] = { 0.f };
+    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x * NUM_LOAD)
+    {
+        for (int step = 0; step < NUM_LOAD; step++)
+            sum[step] += (i + step * blockDim.x * gridDim.x < size) ? g_in[i + step * blockDim.x * gridDim.x] : 0.f;
+    }
+    for (int i = 1; i < NUM_LOAD; i++)
+        sum[0] += sum[i];
     // warp synchronous reduction
-    sum = block_reduce_sum(block, sum);
+    sum[0] = block_reduce_sum(block, sum[0]);
 
     if (block.thread_rank() == 0) {
-        atomicAdd(&g_out[0], sum);
+        atomicAdd(&g_out[0], sum[0]);
     }
 }
 
-void reduction_blk_atmc(float *g_outPtr, float *g_inPtr, int size, int n_threads)
+void atomic_reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
 {   
     int num_sms;
     int num_blocks_per_sm;

@@ -42,17 +42,8 @@ int main(int argc, char *argv[])
 
     cudaMemcpy(d_inPtr, h_inPtr, size * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Get reduction result from GPU (reduction 0)
-    switch (mode) {
-        case 0:
-            // calls block-wize atomic kernel
-            run_benchmark(reduction_blk_atmc, d_outPtr, d_inPtr, size);
-            break;
-        case 1:
-            // calls warp-wize atomic kernel
-            run_benchmark(reduction_wrp_atmc, d_outPtr, d_inPtr, size);
-            break;
-    }
+    // Get reduction result from GPU
+    run_benchmark(atomic_reduction, d_outPtr, d_inPtr, size);
     cudaMemcpy(&result_gpu, &d_outPtr[0], sizeof(float), cudaMemcpyDeviceToHost);
 
     // Get all sum from CPU
