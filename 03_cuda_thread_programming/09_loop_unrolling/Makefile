@@ -1,7 +1,7 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=reduction
+TARGET=reduction_wp reduction_cg
 
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo# --resource-usage
@@ -16,13 +16,19 @@ ALL_CCFLAGS += -g -Xcompiler -fopenmp -rdc=true $(NVCC_FLAGS)
 
 all : ${TARGET}
 
-reduction_kernel.o: reduction_kernel.cu
+reduction_wp_kernel.o: reduction_wp_kernel.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+reduction_cg_kernel.o: reduction_cg_kernel.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 reduction.o: reduction.cpp
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-reduction: reduction.o reduction_kernel.o
+reduction_wp: reduction.o reduction_wp_kernel.o
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+
+reduction_cg: reduction.o reduction_cg_kernel.o
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 clean:
