@@ -4,6 +4,8 @@
 
 using namespace cooperative_groups;
 
+#define NUM_LOAD 4
+
 /*
     Parallel sum reduction using shared memory
     - takes log(n) steps for n input elements
@@ -22,26 +24,28 @@ reduction_kernel(float* g_out, float* g_in, unsigned int size)
     extern __shared__ float s_data[];
 
     // cumulates input with grid-stride loop and save to share memory
-    float input = 0.f;
-    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x)
-        input += g_in[i];
-    s_data[block.thread_index().x] = input;
+    float input[NUM_LOAD] = {0.f};
+    for (int i = idx_x; i < size; i += blockDim.x * gridDim.x * NUM_LOAD)
+    {
+        for (int step = 0; step < NUM_LOAD; step++)
+            input[step] += (i + step * blockDim.x * gridDim.x < size) ? g_in[i + step * blockDim.x * gridDim.x] : 0.f;
+    }
+    for (int i = 1; i < NUM_LOAD; i++)
+        input[0] += input[i];
+    s_data[threadIdx.x] = input[0];
 
     block.sync();
 
     // do reduction
     for (unsigned int stride = block.group_dim().x / 2; stride > 0; stride >>= 1) {
         if (block.thread_index().x < stride) { // scheduled threads reduce for every iteration, and will be smaller than a warp size (32) eventually.
-            coalesced_group active = coalesced_threads(); // Step 5: Warp scheduler selects CUDA threads which is 
             s_data[block.thread_index().x] += s_data[block.thread_index().x + stride];
 
-            // __syncthreads(); // Step 4: Error
-            //block.sync();   // Step 3: Benefit of cooperative group, performance may drop but provides programming flexibility
-
-            active.sync(); // Step 5: Only required threads will do synchronization.
+            // __syncthreads(); // Step 3: Error
+            // block.sync();   // Step 4: Benefit of cooperative group, performance may drop but provides programming flexibility
         }
         // __syncthreads(); // Step 1: Original
-        //block.sync(); // Step 2: Equivalent operation
+        block.sync(); // Step 2: Equivalent operation
     }
 
     if (block.thread_index().x == 0) {
