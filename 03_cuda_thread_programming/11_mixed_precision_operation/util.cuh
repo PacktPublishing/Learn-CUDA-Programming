@@ -27,12 +27,12 @@ class CBuffer
     T *h_ptr_;
     T *d_ptr_;
 
-    void init(int size, bool do_fill = false)
+    void init(int size, bool do_fill = true)
     {
         if (h_ptr_ != NULL)
             return;
 
-        size_ = size;
+        size_ = size * sizeof(T);
         h_ptr_ = (T *)new T[size_];
         d_ptr_ = NULL;
 
@@ -81,12 +81,14 @@ class CBuffer
         cudaMemcpy(temp_ptr, d_ptr_, size_ * sizeof(T), cudaMemcpyDeviceToHost);
         
         #pragma omp parallel
-        for (int i = 0; i < size_; i++) {
-            if (fabs(temp_ptr[i] - h_ptr_[i]) > 0.0001)
-                diff_count++;
+        {
+        #pragma omp for
+            for (int i = 0; i < size_; i++) {
+                if (fabs(temp_ptr[i] - h_ptr_[i]) > 0.0001) 
+                    diff_count++;
+            }
         }
-
-        cudaFree(temp_ptr);
+        delete [] temp_ptr;
 
         return diff_count;
     }

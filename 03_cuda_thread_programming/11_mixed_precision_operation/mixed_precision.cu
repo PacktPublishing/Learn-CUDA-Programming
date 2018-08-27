@@ -9,39 +9,30 @@ using namespace cooperative_groups;
 // FMA numerical arithmetic function in GPU @FP32
 // y = x * y + z
 // in this kernel, assuming we have transposed matrix y
-__global__ void matmul_kernel(float *d_x, float *d_y, float *d_z, int height, int width)
+__global__ void fmaf_kernel(float *d_x, float *d_y, float *d_z, int size)
 {
     int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
-    int idx_y = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    float sum = 0.f;
-    for (int i = 0; i < width; i++)
-        sum += d_y[idx_y * width + i] * d_x[idx_y * width + i];
+    int stride = gridDim.x * blockDim.x;
 
-    d_z[idx_y * width + idx_x] = sum;
+    for (int i = idx_x; i < size; i += stride) {
+        d_z[i] = fmaf(d_x[i], d_y[i], 0.f);
+    }
 }
 
-void matmul_host(float *h_x, float *h_y, float *h_z, int height, int width)
+void fmaf_host(float *h_x, float *h_y, float *h_z, int size)
 {
     #pragma omp parallel
-    for (int idx_y = 0; idx_y < height; idx_y++) {
-        for (int idx_x = 0; idx_x < width; idx_x++) {
-            float sum = 0.f;
-            for (int i = 0; i < width; i++)
-                sum += h_y[idx_y * width + i] * h_x[idx_y * width + i];
-
-            h_z[idx_y * width + idx_x] = sum;
-        }
+    {
+    #pragma omp for
+        for (int i = 0; i < size; i++)
+            h_z[i] = h_x[i] * h_y[i] + 0.f;
     }
 }
 
 int main()
 {
-    CBuffer<float> W, X, Y, Z;
-    int width = 1 << 10;
-    int height = 1 << 10;
-    int size = width * height;
-    int n_iteration = 100;
+    CBuffer<float> X, Y, Z;
+    int size = 1 << 26;
 
     srand(2019);
 
@@ -55,28 +46,29 @@ int main()
     Y.cuda();
     Z.cuda();
 
-    // start initial 1 operation as a warm start
-    dim3 dimBlock(16, 8);
-    dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x, (height + dimBlock.y - 1) / dimBlock.y);
-    matmul_kernel<<< dimGrid, dimBlock >>>(X.d_ptr_, Y.d_ptr_, Z.d_ptr_, height, width);
+    // getting number of blocks for stride-loop
+    int n_threads = 256;
+    int num_sms;
+    int num_blocks_per_sm;
+    cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, 0);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&num_blocks_per_sm, fmaf_kernel, n_threads, n_threads*sizeof(float2));
+    int n_blocks = min(num_blocks_per_sm * num_sms, (size/2 + n_threads - 1) / n_threads);
 
     // initialize timer
     StopWatchInterface *timer;
     sdkCreateTimer(&timer);
     sdkStartTimer(&timer);
-
-    for (int i = 0; i < n_iteration; i++) {
-        matmul_kernel<<< dimGrid, dimBlock >>>(X.d_ptr_, Y.d_ptr_, Z.d_ptr_, height, width);
-    }
-
+    
+    fmaf_kernel<<< n_blocks, n_threads, n_threads * sizeof(float) >>>(X.d_ptr_, Y.d_ptr_, Z.d_ptr_, size);
+    
     cudaDeviceSynchronize();
     sdkStopTimer(&timer);
 
-    float elapsedTimeMs = sdkGetTimerValue(&timer) / (float)n_iteration;
-    float throughput = 2.f * size / elapsedTimeMs;
-    printf("FMA, Throughput = %.3f GFlops, Operation Time= %.3f msec\n", throughput * 1e-6, elapsedTimeMs);
+    float elapsedTimeMs = sdkGetTimerValue(&timer);
+    float ops = size / elapsedTimeMs * 1e-6;
+    printf("FMA, FLOPS = %.3f GFlops, Operation Time= %.3f msec\n", ops, elapsedTimeMs);
 
-    matmul_host(X.h_ptr_, Y.h_ptr_, Z.h_ptr_, height, width);
+    fmaf_host(X.h_ptr_, Y.h_ptr_, Z.h_ptr_, size);
 
     int diff_count = Z.diff_count();
     (diff_count == 0) ? printf("Success!!\n") : printf("Counted diff!! (%d times)\n", diff_count);
@@ -86,7 +78,3 @@ int main()
     
     return 0;
 }
-
-
-
-

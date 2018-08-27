@@ -46,41 +46,37 @@ using namespace cooperative_groups;
 // FMA numerical arithmetic function in GPU @INT8
 // y = x * y + z
 // in this kernel, assuming we have transposed matrix y
-__global__ void dp4a_kernel(char *d_x, char *d_y, int *d_z, int height, int width)
+__global__ void dp4a_kernel(char *d_x, char *d_y, int *d_z, int size)
 {
-    grid_group grid = this_grid();
-    thread_block block = this_thread_block();
-
-    int idx_x = block.group_dim().x * block.group_index().x + block.thread_index().x;
-    int idx_y = block.group_dim().y * block.group_index().y + block.thread_index().y;
-    int stride = grid.size();
+    int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = gridDim.x * blockDim.x;
 
 #if __CUDA_ARCH__ >= 610
-    int quater_size = width / 4;
     char4 *quad_x = (char4 *)d_x;
     char4 *quad_y = (char4 *)d_y;
     
-    int sum = 0;
-    for (int i = 0; i < quater_size; i++)
-        sum += __dp4a(quad_y[idx_y * quater_size + i], quad_x[idx_y * quater_size + i], 0);
+    for (int i = idx_x; i < size; i+=stride)
+        d_z[i] = __dp4a(quad_y[i], quad_x[i], 0);
 #else
-    int sum = 0;
-    for (int i = 0; i < width; i++ )
-        sum += d_y[idx_y * width + i] * d_x[idx_y * width + i];
+    for (int i = idx_x; i < size; i+=4*stride) {
+        int sum = 0;
+        for (int j = 0; j < 4; j++)
+            sum += d_y[4 * i + j] * d_x[4 * i + j];
+        d_z[i] = sum + 0; 
+    }
 #endif
-    d_z[idx_y * width + idx_x] = sum;
 }
 
-void matmul_host(char *h_x, char *h_y, int *h_z, int height, int width)
+void dp4a_host(char *h_x, char *h_y, int *h_z, int size)
 {
     #pragma omp parallel
-    for (int idx_y = 0; idx_y < height; idx_y++) {
-        for (int idx_x = 0; idx_x < width; idx_x++) {
-            float sum = 0.f;
-            for (int i = 0; i < width; i++)
-                sum += h_y[idx_y * width + i] * h_x[idx_y * width + i];
-
-            h_z[idx_y * width + idx_x] = sum;
+    {
+    #pragma omp for
+        for (int i = 0; i < size; i += 4) {
+            int sum = 0;
+            for (int j = 0; j < 4; j++)
+                sum += h_y[4 * i + j] * h_x[4 * i + j];
+            h_z[i] = sum + 0; 
         }
     }
 }
@@ -89,47 +85,43 @@ int main()
 {
     CBuffer<char> X, Y;
     CBuffer<int> Z;
-    int height = 1 << 10;
-    int width = 1 << 10;
-    int size = height * width;
-    int n_iteration = 100;
+    int size = 1 << 26;
 
     srand(2019);
 
     // initialize host buffers
     X.init(size, true);
     Y.init(size, true);
-    Z.init(size);
+    Z.init(size/4, true);
 
     // initalize gpu buffers
     X.cuda();
     Y.cuda();
     Z.cuda();
 
-    // convert x and y from float type to half type
-    dim3 dimBlock(64, 8);
-    dim3 dimGrid((width + dimBlock.x - 1) / dimBlock.x, (height + dimBlock.y - 1) / dimBlock.y);
+    // getting number of blocks for stride-loop
+    int n_threads = 256;
+    int num_sms;
+    int num_blocks_per_sm;
+    cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, 0);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&num_blocks_per_sm, dp4a_kernel, n_threads, n_threads*sizeof(int));
+    int n_blocks = min(num_blocks_per_sm * num_sms, (size/4 + n_threads - 1) / n_threads);
         
-    // start initial 1 operation as a warm start
-    dp4a_kernel<<< dimGrid, dimBlock >>>(X.d_ptr_, Y.d_ptr_, Z.d_ptr_, height, width);
-
     // initialize timer
     StopWatchInterface *timer;
     sdkCreateTimer(&timer);
     sdkStartTimer(&timer);
 
-    for (int i = 0; i < n_iteration; i++) {
-        dp4a_kernel<<< dimGrid, dimBlock >>>(X.d_ptr_, Y.d_ptr_, Z.d_ptr_, height, width);
-    }
+    dp4a_kernel<<< n_blocks, n_threads, n_threads * sizeof(int) >>>(X.d_ptr_, Y.d_ptr_, Z.d_ptr_, size/4);
 
     cudaDeviceSynchronize();
     sdkStopTimer(&timer);
 
-    float elapsedTimeMs = sdkGetTimerValue(&timer) / (float)n_iteration;
-    float throughput = 3 * 2.f * size / elapsedTimeMs;
-    printf("FMA, Throughput = %.3f GFlops, Operation Time= %.3f msec\n", throughput * 1e-6, elapsedTimeMs);
+    float elapsedTimeMs = sdkGetTimerValue(&timer);
+    float ops = size / elapsedTimeMs * 1e-6;
+    printf("FMA, FLOPS = %.3f GFlops, Operation Time= %.3f msec\n", ops, elapsedTimeMs);
 
-    matmul_host(X.h_ptr_, Y.h_ptr_, Z.h_ptr_, height, width);
+    dp4a_host(X.h_ptr_, Y.h_ptr_, Z.h_ptr_, size/4);
 
     int diff_count = Z.diff_count();
     (diff_count == 0) ? printf("Success!!\n") : printf("Counted diff!! (%d times)\n", diff_count);
