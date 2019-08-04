@@ -2,13 +2,13 @@
 #include <stdlib.h>
 
 #include <cuda_runtime.h>
+#include <cuda_profiler_api.h>
 #include "../03_scan/scan_v2.cu"
-#include "../03_scan/utils.h"
 
-#define FILTER_MASK 0.f
-#define GRID_DIM    1       // this implementation covers 1 thread block only
+#define FLT_ZERO 0.f
+#define GRID_DIM    1       // this implementation covers only 1 thread block's operation
 
-#define BLOCK_DIM 16
+// #define BLOCK_DIM 16
 
 void generate_data(float *ptr, int length);
 
@@ -21,12 +21,13 @@ predicate_kernel(float *d_predicates, float *d_input, int length)
 
     if (idx >= length) return;
 
-    d_predicates[idx] = d_input[idx] > FILTER_MASK;
+    d_predicates[idx] = d_input[idx] > FLT_ZERO;
 }
 
 // scan
+/* We will use the previous implementation */
 
-// address
+// address and gather
 __global__ void
 pack_kernel(float *d_output, float *d_input, float *d_predicates, float *d_scanned, int length)
 {
@@ -39,7 +40,7 @@ pack_kernel(float *d_output, float *d_input, float *d_predicates, float *d_scann
         // address
         int address = d_scanned[idx] - 1;
 
-        // scatter
+        // gather
         d_output[address] = d_input[idx];
     }
 }
@@ -67,11 +68,23 @@ void pack_host(float *h_output, float *h_input, int length)
     int idx_output = 0;
     for (int i = 0; i < length; i++)
     {
-        if (h_input[i] > FILTER_MASK)
+        if (h_input[i] > FLT_ZERO)
         {
             h_output[idx_output] = h_input[i];
             idx_output++;
         }
+    }
+}
+
+// split_host: pseudo implementation for evaluation purpose
+void split_host(float *h_output, float *h_input, int length)
+{
+    for (int i = 0; i < length; i++)
+    {
+        if (h_input[i] >= 0.f)
+            h_output[i] = h_input[i];
+        else
+            h_output[i] = 0.f;
     }
 }
 
@@ -99,50 +112,52 @@ int main()
     generate_data(h_input, length);
     cudaMemcpy(d_input, h_input, sizeof(float) * length, cudaMemcpyHostToDevice);
 
-    if (length <= DEBUG_OUTPUT_NUM)
-        print_val(h_input, length, "input   ::");
+    print_val(h_input, DEBUG_OUTPUT_NUM, "input    ::");
 
+    cudaProfilerStart();
+    /********************************
+     * Pack                         *
+     ********************************/
     // predicates
     predicate_kernel<<< GRID_DIM, BLOCK_DIM >>>(d_predicates, d_input, length);
-
-    // debug
-    cudaMemcpy(h_output_gpu, d_predicates, sizeof(float) * length, cudaMemcpyDeviceToHost);
 
     // scan
     scan_v2(d_scanned, d_predicates, length);
 
-    // addressing & scatter (pack)
+    // addressing & gather (pack)
     pack_kernel<<< GRID_DIM, BLOCK_DIM >>>(d_output, d_input, d_predicates, d_scanned, length);
     cudaDeviceSynchronize();
 
-    // validation the result (pack)
+    // validation the result (compack)
     cudaMemcpy(h_output_gpu, d_output, sizeof(float) * length, cudaMemcpyDeviceToHost);
     pack_host(h_output_host, h_input, length);
+
+    print_val(h_output_host, DEBUG_OUTPUT_NUM, "pack[cpu]::");
+    print_val(h_output_gpu, DEBUG_OUTPUT_NUM, "pack[gpu]::");
+
     if (validation(h_output_host, h_output_gpu, length))
         printf("SUCCESS!!\n");
     else
         printf("Something wrong..\n");
 
-    // debug
-    if (length <= DEBUG_OUTPUT_NUM)
-        print_val(h_output_host, length, "pack[host]::");
-    if (length <= DEBUG_OUTPUT_NUM)
-        print_val(h_output_gpu, length, "pack[gpu] ::");
-
-    // split
-    cudaMemset(d_input, 0, sizeof(float) * length);
-    split_kernel<<<GRID_DIM, BLOCK_DIM>>>(d_input, d_output, d_predicates, d_scanned, length);
+    /********************************
+     * Split                        *
+     ********************************/
+    cudaMemcpy(d_input, d_output, sizeof(float) * length, cudaMemcpyDeviceToDevice);
+    cudaMemset(d_output, 0, sizeof(float) * length);
+    split_kernel<<<GRID_DIM, BLOCK_DIM>>>(d_output, d_input, d_predicates, d_scanned, length);
     cudaDeviceSynchronize();
+    cudaProfilerStop();
 
     // validation the result (split)
-    cudaMemcpy(h_output_gpu, d_input, sizeof(float) * length, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_output_gpu,  d_output, sizeof(float) * length, cudaMemcpyDeviceToHost);
+    split_host(h_output_host, h_input, length); // notice: we just generate desired output for the evaluation purpose
+
+    print_val(h_output_gpu, DEBUG_OUTPUT_NUM, "split[gpu]");
     if (validation(h_output_host, h_output_gpu, length))
         printf("SUCCESS!!\n");
     else
         printf("Something wrong..\n");
-
-    if (length <= DEBUG_OUTPUT_NUM)
-        print_val(h_output_gpu, length, "split[gpu]");
 
     // finalize
     cudaFree(d_predicates);
