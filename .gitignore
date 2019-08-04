@@ -11,6 +11,8 @@
 
 *.o
 *.nvvp
+*.pyc
 .DS_Store
+__pycache__
 
 !Makefile
