@@ -5,17 +5,12 @@ scan_v2_kernel(float *d_output, float *d_input, int length)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     int tid = threadIdx.x;
+
     extern __shared__ float s_buffer[];
-
-    int offset = 1;
-
     s_buffer[threadIdx.x] = d_input[idx];
     s_buffer[threadIdx.x + BLOCK_DIM] = d_input[idx + BLOCK_DIM];
 
-    // printf("[%d, %3.f]\t", tid, s_buffer[tid]);
-    // printf("[%d, %3.f]\t", tid, s_buffer[tid + BLOCK_DIM]);
-    // if (tid == 0)
-    //     printf("\n");
+    int offset = 1;
 
     while (offset < length)
     {
@@ -26,17 +21,17 @@ scan_v2_kernel(float *d_output, float *d_input, int length)
 
         if (idx_a >= 0 && idx_b < 2 * BLOCK_DIM)
         {
-            // printf("<< %d, %d >>\n", idx_a, idx_b);
+#if (DEBUG_INDEX > 0)
+            printf("[ %d, %d ]\t", idx_a, idx_b);
+#endif
             s_buffer[idx_b] += s_buffer[idx_a];
         }
 
         offset <<= 1;
+#if (DEBUG_INDEX > 0)
+        if (tid == 0)   printf("\n--------------------------------\n");
+#endif  
     }
-
-    // printf("[%d, %3.f]\t", tid, s_buffer[tid]);
-    // printf("[%d, %3.f]\t", tid, s_buffer[tid + BLOCK_DIM]);
-    // if (tid == 0)
-    //     printf("\n");
 
     offset >>= 1;
     while (offset > 0)
@@ -48,16 +43,18 @@ scan_v2_kernel(float *d_output, float *d_input, int length)
 
         if (idx_a >= 0 && idx_b < 2 * BLOCK_DIM)
         {
+#if (DEBUG_INDEX > 0)
+            printf("[ %d, %d ]\t", idx_a, idx_b);
+#endif
             s_buffer[idx_b] += s_buffer[idx_a];
-            // printf("<< %d, %d >>\n", idx_a, idx_b);
         }
 
         offset >>= 1;
+#if (DEBUG_INDEX > 0)
+        if (tid == 0)   printf("\n--------------------------------\n");
+#endif  
     }
     __syncthreads();
-
-    // printf("[%d, %3.f]\t", tid, s_buffer[tid]);
-    // printf("[%d, %3.f]\t", tid, s_buffer[tid + BLOCK_DIM]);
 
     d_output[idx] = s_buffer[tid];
     d_output[idx + BLOCK_DIM] = s_buffer[tid + BLOCK_DIM];
