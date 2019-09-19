@@ -16,7 +16,7 @@ ALL_CCFLAGS += -g -Xcompiler -fopenmp -rdc=true
 
 all : ${TARGET}
 
-reduction_kernel.o: reduction_kernel_extra.cu
+reduction_kernel.o: reduction_kernel.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 reduction.o: reduction.cpp

@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <cfloat>
+#include <iostream>
 
 template <typename T>
 class CBuffer
@@ -32,18 +33,17 @@ class CBuffer
         if (h_ptr_ != NULL)
             return;
 
-        size_ = size * sizeof(T);
+        size_ = size;
         h_ptr_ = (T *)new T[size_];
         d_ptr_ = NULL;
 
         if (do_fill == true)
         {
             for (int i = 0; i < size_; i++)
-                if (sizeof(T) >= 2)    
-                    h_ptr_[i] = .1f * rand() / (float)RAND_MAX;
+                if (sizeof(T) >= 2)
+                    h_ptr_[i] = (rand() & 0xFF) / (float)RAND_MAX;
                 else
-                    h_ptr_[i] = rand() % 10;
-
+                    h_ptr_[i] = i & 0xF;
         }
     }
 

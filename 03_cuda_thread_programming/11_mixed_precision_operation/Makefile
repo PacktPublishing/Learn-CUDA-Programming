@@ -1,7 +1,7 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=mixed_precision mixed_precision_half mixed_precision_int 
+TARGET=mixed_precision_single mixed_precision_half mixed_precision_int 
 
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo # --resource-usage
@@ -20,7 +20,7 @@ all : ${TARGET}
 mixed_precision_half: mixed_precision_half.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
-mixed_precision: mixed_precision.cu
+mixed_precision_single: mixed_precision.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 mixed_precision_int: mixed_precision_int.cu

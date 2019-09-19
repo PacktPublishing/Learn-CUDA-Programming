@@ -31,22 +31,14 @@ main(int argc, char *argv[])
     float result_host, result_gpu;
     int mode = -1;
 
-    if (argc > 1) {
-        mode = atoi(argv[1]);
-        if (mode < 0 || mode > 1)
-            message();
-    }
-    else {
-        message();
-    }
-
     srand(2019);
 
     // Allocate memory
     h_inPtr = (float*)malloc(size * sizeof(float));
-    
-    // Data initialization with random values
+
+    // Data initialization with random values and obtain answer
     init_input(h_inPtr, size);
+    result_host = get_cpu_result(h_inPtr, size);
 
     // Prepare GPU resource
     cudaMalloc((void**)& d_inPtr, size * sizeof(float));
@@ -54,26 +46,11 @@ main(int argc, char *argv[])
 
     cudaMemcpy(d_inPtr, h_inPtr, size * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Get reduction result from GPU (reduction 0)
-    switch (mode)
-    {
-        case 0:
-            printf("interleave addressing\n");
-            run_benchmark(reduction_1, d_outPtr, d_inPtr, size); break;
-        case 1:
-            printf("sequential addressing\n");
-            run_benchmark(reduction_2, d_outPtr, d_inPtr, size); break;
-        default:
-            message();
-    }
-    cudaMemcpy(&result_gpu, &d_outPtr[0], sizeof(float), cudaMemcpyDeviceToHost);
-
     // Get reduction result from GPU
-
-    // Get all sum from CPU
-    result_host = get_cpu_result(h_inPtr, size);
+    run_benchmark(reduction, d_outPtr, d_inPtr, size);
+    cudaMemcpy(&result_gpu, &d_outPtr[0], sizeof(float), cudaMemcpyDeviceToHost);
     printf("host: %f, device %f\n", result_host, result_gpu);
-    
+
     // Terminates memory
     cudaFree(d_outPtr);
     cudaFree(d_inPtr);
@@ -98,7 +75,7 @@ run_benchmark(int (*reduce)(float*, float*, int, int),
               float *d_outPtr, float *d_inPtr, int size)
 {
     int num_threads = 256;
-    int test_iter = 100;
+    int test_iter = 5;
 
     // warm-up
     reduce(d_outPtr, d_inPtr, size, num_threads);

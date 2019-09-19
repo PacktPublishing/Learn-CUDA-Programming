@@ -7,10 +7,8 @@
     - uses n threads
     - only works for power-of-2 arrays
 */
-
-// cuda thread synchronization
 __global__ void
-reduction_kernel_1(float* g_out, float* g_in, unsigned int size)
+reduction_kernel_2(float *g_out, float *g_in, unsigned int size)
 {
     unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -21,14 +19,12 @@ reduction_kernel_1(float* g_out, float* g_in, unsigned int size)
     __syncthreads();
 
     // do reduction
-    // interleaved addressing
-    for (unsigned int stride = 1; stride < blockDim.x; stride *= 2)
+    // sequential addressing
+    for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1)
     {
-        int index = 2 * stride * threadIdx.x;
-        
-        if (index < blockDim.x)
-            s_data[index] += s_data[index + stride];
-        
+        if (threadIdx.x < stride)
+            s_data[threadIdx.x] += s_data[threadIdx.x + stride];
+
         __syncthreads();
     }
 
@@ -36,10 +32,9 @@ reduction_kernel_1(float* g_out, float* g_in, unsigned int size)
         g_out[blockIdx.x] = s_data[0];
 }
 
-int reduction_1(float *g_outPtr, float *g_inPtr,
-                int size, int n_threads)
+int reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
 {
     int n_blocks = (size + n_threads - 1) / n_threads;
-    reduction_kernel_1<<< n_blocks, n_threads, n_threads * sizeof(float), 0 >>>(g_outPtr, g_inPtr, size);
+    reduction_kernel_2<<< n_blocks, n_threads, n_threads * sizeof(float), 0 >>>(g_outPtr, g_inPtr, size);
     return n_blocks;
 }

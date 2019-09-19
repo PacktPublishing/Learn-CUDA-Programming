@@ -72,11 +72,11 @@ void dp4a_host(char *h_x, char *h_y, int *h_z, int size)
     #pragma omp parallel
     {
     #pragma omp for
-        for (int i = 0; i < size; i += 4) {
+        for (int i = 0; i < size; i++) {
             int sum = 0;
-            for (int j = 0; j < 4; j++)
-                sum += h_y[4 * i + j] * h_x[4 * i + j];
-            h_z[i] = sum + 0; 
+            for (int j = 0; j < 4; j++) 
+                sum += (int)h_y[4 * i + j] * (int)h_x[4 * i + j];
+            h_z[i] = sum; 
         }
     }
 }
@@ -119,7 +119,7 @@ int main()
 
     float elapsedTimeMs = sdkGetTimerValue(&timer);
     float ops = size / elapsedTimeMs * 1e-6;
-    printf("FMA, FLOPS = %.3f GFlops, Operation Time= %.3f msec\n", ops, elapsedTimeMs);
+    printf("IMA, OPS = %.3f Gops, Operation Time= %.3f msec\n", ops, elapsedTimeMs);
 
     dp4a_host(X.h_ptr_, Y.h_ptr_, Z.h_ptr_, size/4);
 

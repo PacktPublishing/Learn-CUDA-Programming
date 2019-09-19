@@ -1,12 +1,7 @@
 #include <stdio.h>
-#include <cooperative_groups.h>
 #include "reduction.h"
 
-//namespace cg = cooperative_groups;
-using namespace cooperative_groups;
-
 #define NUM_LOAD 4
-#define FULL_MASK 0xffffffff
 
 /*
     Parallel sum reduction using shared memory
@@ -16,17 +11,17 @@ using namespace cooperative_groups;
 */
 
 /**
-    To get atomic power we will refer this
+    Two warp level primitives are used here for this example
     https://devblogs.nvidia.com/faster-parallel-reductions-kepler/
-    https://devblogs.nvidia.com/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/
+    https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
  */
 
 __inline__ __device__ float warp_reduce_sum(float val)
 {
-    #pragma unroll 5
-    for (int offset = 1; offset < 6; offset++)
-          val += __shfl_down_sync(FULL_MASK, val, warpSize >> offset);  // (16 --> 1)
-
+    for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
+        unsigned int mask = __activemask();
+        val += __shfl_down_sync(mask, val, offset);
+    }
     return val;
 }
 
@@ -36,7 +31,8 @@ __inline__ __device__ float block_reduce_sum(float val)
     int lane = threadIdx.x % warpSize;
     int wid = threadIdx.x / warpSize;
 
-    val = warp_reduce_sum(val); // Each warp performs partial reduction
+    // Each warp performs partial reduction
+    val = warp_reduce_sum(val); 
 
     if (lane == 0)
         shared[wid] = val; // Write reduced value to shared memory
@@ -52,13 +48,11 @@ __inline__ __device__ float block_reduce_sum(float val)
     return val;
 }
 
-// large vector reduction
+// cuda thread synchronization
 __global__ void
-reduction_kernel(float* g_out, float* g_in, unsigned int size)
+reduction_kernel(float *g_out, float *g_in, unsigned int size)
 {
     unsigned int idx_x = blockIdx.x * blockDim.x + threadIdx.x;
-
-    thread_block block = this_thread_block();
 
     // cumulates input with grid-stride loop and save to share memory
     float sum[NUM_LOAD] = { 0.f };
@@ -72,18 +66,18 @@ reduction_kernel(float* g_out, float* g_in, unsigned int size)
     // warp synchronous reduction
     sum[0] = block_reduce_sum(sum[0]);
 
-    if (block.thread_index().x == 0)
-        g_out[block.group_index().x] = sum[0];
+    if (threadIdx.x == 0)
+        g_out[blockIdx.x] = sum[0];
 }
 
 void reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
-{   
+{
     int num_sms;
     int num_blocks_per_sm;
     cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, 0);
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(&num_blocks_per_sm, reduction_kernel, n_threads, n_threads*sizeof(float));
     int n_blocks = min(num_blocks_per_sm * num_sms, (size + n_threads - 1) / n_threads);
 
-    reduction_kernel<<< n_blocks, n_threads>>>(g_outPtr, g_inPtr, size);
-    reduction_kernel<<< 1, n_threads >>>(g_outPtr, g_inPtr, n_blocks);
+    reduction_kernel<<<n_blocks, n_threads>>>(g_outPtr, g_inPtr, size);
+    reduction_kernel<<< 1, n_threads, n_threads * sizeof(float), 0 >>>(g_outPtr, g_inPtr, n_blocks);
 }

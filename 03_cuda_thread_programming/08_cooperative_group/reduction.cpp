@@ -7,7 +7,7 @@
 
 #include "reduction.h"
 
-void run_benchmark(int (*reduce)(float*, float*, int, int), 
+void run_benchmark(void (*reduce)(float*, float*, int, int), 
                    float *d_outPtr, float *d_inPtr, int size);
 void init_input(float* data, int size);
 float get_cpu_result(float *data, int size);
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
 
     // Allocate memory
     h_inPtr = (float*)malloc(size * sizeof(float));
-
+    
     // Data initialization with random values
     init_input(h_inPtr, size);
 
@@ -57,17 +57,14 @@ int main(int argc, char *argv[])
 }
 
 void
-run_reduction(int (*reduce)(float*, float*, int, int), 
+run_reduction(void (*reduce)(float*, float*, int, int), 
               float *d_outPtr, float *d_inPtr, int size, int n_threads)
 {
-    while(size > 1) 
-    {
-        size = reduce(d_outPtr, d_inPtr, size, n_threads);
-    }
+    reduce(d_outPtr, d_inPtr, size, n_threads);
 }
 
 void
-run_benchmark(int (*reduce)(float*, float*, int, int), 
+run_benchmark(void (*reduce)(float*, float*, int, int), 
               float *d_outPtr, float *d_inPtr, int size)
 {
     int num_threads = 256;
@@ -76,6 +73,7 @@ run_benchmark(int (*reduce)(float*, float*, int, int),
     // warm-up
     reduce(d_outPtr, d_inPtr, size, num_threads);
 
+    // initialize timer
     StopWatchInterface *timer;
     sdkCreateTimer(&timer);
     sdkStartTimer(&timer);

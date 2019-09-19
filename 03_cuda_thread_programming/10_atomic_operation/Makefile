@@ -1,7 +1,7 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=reduction_simple_atomic reduction_warp_atomic reduction_block_atomic
+TARGET=reduction_atomic_simple reduction_atomic_warp reduction_atomic_block
 
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo # --resource-usage
@@ -28,13 +28,13 @@ reduction_kernel.o: reduction_kernel.cu
 reduction.o: reduction.cpp
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-reduction_simple_atomic: reduction.o reduction_kernel.o
+reduction_atomic_simple: reduction.o reduction_kernel.o
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
-reduction_warp_atomic: reduction.o reduction_wrp_atmc_kernel.o
+reduction_atomic_warp: reduction.o reduction_wrp_atmc_kernel.o
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
-reduction_block_atomic: reduction.o reduction_blk_atmc_kernel.o
+reduction_atomic_block: reduction.o reduction_blk_atmc_kernel.o
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 clean:
