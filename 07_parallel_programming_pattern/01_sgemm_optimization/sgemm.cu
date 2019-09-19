@@ -3,7 +3,7 @@
 #include <cuda_profiler_api.h>
 
 #define RESULT_VERIFICATION 0   // change 1 if you want to verify the result
-#define BLOCK_DIM 16    
+#define BLOCK_DIM 16   
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Compute reference data set matrix multiply on GPU

@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>
+#include "../03_scan/utils.h"
 #include "../03_scan/scan_v2.cu"
 
 #define FLT_ZERO 0.f
@@ -25,7 +26,7 @@ predicate_kernel(float *d_predicates, float *d_input, int length)
 }
 
 // scan
-/* We will use the previous implementation */
+/* We will use the previous implementation (#include "../03_scan/scan_v2.cu") */
 
 // address and gather
 __global__ void

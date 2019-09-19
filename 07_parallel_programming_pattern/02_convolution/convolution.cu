@@ -282,8 +282,8 @@ int main()
     sdkStartTimer(&timer_gpu);
     convolution_gpu(3, d_output, d_input, d_filter, num_row, num_col, filter_size);
     cudaDeviceSynchronize();
-    cudaProfilerStop();
     sdkStopTimer(&timer_gpu);
+    cudaProfilerStop();
     elapsed_time_gpu = sdkGetTimerValue(&timer_gpu);
     printf("Processing Time (3) -> GPU: %.2f ms\n", elapsed_time_gpu);
 

@@ -68,7 +68,6 @@ int main()
 void scan_host(float *h_output, float *h_input, int length, int version)
 {
     bool debug = false;
-    float temp = 0.f;
 
     if (debug)
     {
