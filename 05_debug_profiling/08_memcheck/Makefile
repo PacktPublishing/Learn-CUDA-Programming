@@ -1,7 +1,7 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=simple_sgemm oob mem_leak
+TARGET=simple_sgemm simple_sgemm_oob simple_sgemm_mem_leak
 
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64
@@ -20,10 +20,10 @@ all : ${TARGET}
 simple_sgemm: simple_sgemm.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
-oob: simple_sgemm_oob.cu
+simple_sgemm_oob: simple_sgemm_oob.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
-mem_leak: simple_sgemm_mem_leak.cu
+simple_sgemm_mem_leak: simple_sgemm_mem_leak.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 clean:
