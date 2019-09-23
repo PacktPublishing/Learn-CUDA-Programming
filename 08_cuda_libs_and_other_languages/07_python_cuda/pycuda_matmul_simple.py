@@ -60,7 +60,7 @@ print("GPU Execution Time: %.3f ms" % (gpu_time))
 
 print("Started Host operation...")
 start = timeit.default_timer()
-c_host = np.matmul(a=A, b=B)
+c_host = np.matmul(A, B)
 host_time = timeit.default_timer() - start
 
 print("CPU Execution Time: %.3f ms" % (host_time * 1e3))
