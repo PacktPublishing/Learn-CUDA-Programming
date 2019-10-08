@@ -53,8 +53,8 @@ With the following software and hardware list you can run all code files present
 
 We also provide a PDF file that has color images of the screenshots/diagrams used in this book. [Click here to download it](https://static.packt-cdn.com/downloads/9781788996242_ColorImages.pdf).
 
-### Related products
-* Hands-On GPU-Accelerated Computer Vision with OpenCV and CUDA  [[Packt]](https://www.packtpub.com/application-development/hands-gpu-accelerated-computer-vision-opencv-and-cuda?utm_source=github&utm_medium=repository&utm_campaign=9781789348293) [[Amazon]](https://www.amazon.com/dp/1789348293)
+### Related product
+Hands-On GPU-Accelerated Computer Vision with OpenCV and CUDA  [[Packt]](https://www.packtpub.com/application-development/hands-gpu-accelerated-computer-vision-opencv-and-cuda?utm_source=github&utm_medium=repository&utm_campaign=9781789348293) [[Amazon]](https://www.amazon.com/dp/1789348293)
 
 ## Get to Know the Authors
 **Jaegeun Han**
