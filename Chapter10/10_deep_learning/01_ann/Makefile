@@ -1,4 +1,5 @@
 CUDA_PATH=/usr/local/cuda
+# CUDA_PATH=/cm/extra/apps/CUDA.linux86-64/10.0.130_410.48
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
 TARGET=train
@@ -26,6 +27,7 @@ ${OBJ_DIR}/%.o: ${SRC_DIR}/%.cu ${INCS}
 	$(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -c $< -o $@
 
 ${OBJ_DIR}/train.o: train.cpp ${INCS}
+	@mkdir -p $(@D)
 	$(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -c $< -o $@
 
 OBJS = ${OBJ_DIR}/train.o ${OBJ_DIR}/mnist.o ${OBJ_DIR}/loss.o ${OBJ_DIR}/layer.o ${OBJ_DIR}/network.o 
