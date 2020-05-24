@@ -23,4 +23,4 @@ nvprof: pack_n_split
 	nvprof -f -o $+-metrics.nvvp --analysis-metrics ./$+
 
 clean:
-	rm -f ${TARGET} *.o
+	rm -f ${TARGET} *.o *.nvvp

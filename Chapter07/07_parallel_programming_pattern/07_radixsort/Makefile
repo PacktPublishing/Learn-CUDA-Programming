@@ -7,7 +7,7 @@ INCLUDES =
 NVCC_FLAGS=-m64 -lineinfo #--resource-usage
 
 # Gencode argumentes
-SMS = 70 75
+SMS = 30 35 37 50 52 60 61 70 75
 $(foreach sm, ${SMS}, $(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
 ALL_CCFLAGS += -rdc=true $(NVCC_FLAGS) $(INCLUDES)
