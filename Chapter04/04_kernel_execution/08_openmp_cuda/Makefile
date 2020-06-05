@@ -1,9 +1,9 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=openmp openmp_gpus
+TARGET=openmp openmp_default_stream openmp_gpus
 
-INCLUDES = -I${CUDA_PATH}/samples/common/inc
+INCLUDES = -I${CUDA_PATH}/samples/common
 NVCC_FLAGS=-m64 -lineinfo # --resource-usage
 
 # Gencode argumentes
@@ -20,6 +20,9 @@ openmp: openmp.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(INCLUDES)
 
 openmp_gpus: openmp_gpus.cu
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(INCLUDES)
+
+openmp_default_stream: openmp_default_stream.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(INCLUDES)
 
 nvprof: openmp
