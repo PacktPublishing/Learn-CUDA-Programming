@@ -3,7 +3,7 @@
 #include "src/layer.h"
 
 #include <iomanip>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 using namespace cudl;
 
@@ -90,7 +90,9 @@ int main(int argc, char* argv[])
             float loss = model.loss(train_target);
             float accuracy =  100.f * tp_count / monitoring_step / batch_size_train;
             
-            std::cout << "step: " << std::right << std::setw(4) << step << ", loss: " << std::left << std::setw(5) << std::fixed << std::setprecision(3) << loss << ", accuracy: " << accuracy << "%" << std::endl;
+            std::cout << "step: " << std::right << std::setw(4) << step << \
+                         ", loss: " << std::left << std::setw(5) << std::fixed << std::setprecision(3) << loss << \
+                         ", accuracy: " << accuracy << "%" << std::endl;
 
             tp_count = 0;
         }

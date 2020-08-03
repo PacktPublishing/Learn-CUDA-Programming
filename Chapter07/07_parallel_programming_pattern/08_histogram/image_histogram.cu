@@ -4,15 +4,11 @@
 #define BLOCK_SIZE_X 32
 #define BLOCK_SIZE_Y 32
 
-//Step 1: Declare the texture memory
-texture<unsigned char, 2, cudaReadModeElementType> tex;
-
-
 //Kernel which calculate the resized image
 __global__ void calculateHistogram(unsigned int *imageHistogram, unsigned int width, unsigned int height, cudaTextureObject_t texObj)
 {
-        const unsigned int tidX = blockIdx.x*blockDim.x + threadIdx.x;
-        const unsigned int tidY = blockIdx.y*blockDim.y + threadIdx.y;
+	const unsigned int tidX = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int tidY = blockIdx.y*blockDim.y + threadIdx.y;
 	
 	const unsigned int localId = threadIdx.y*blockDim.x+threadIdx.x;
 	const unsigned int histStartIndex = (blockIdx.y*gridDim.x+blockIdx.x) * 256;
@@ -23,13 +19,14 @@ __global__ void calculateHistogram(unsigned int *imageHistogram, unsigned int wi
 		histo_private[localId] = 0;
 	__syncthreads();
 
+	// Step 4: Read the texture memory from your texture reference in CUDA Kernel
 	unsigned char imageData =  tex2D<unsigned char>(texObj,(float)(tidX),(float)(tidY));
 	atomicAdd(&(histo_private[imageData]), 1);
 
 	 __syncthreads();
 
-	if(localId <256)
-        	imageHistogram[histStartIndex+localId] = histo_private[localId];      
+	if(localId < 256)
+		imageHistogram[histStartIndex+localId] = histo_private[localId];      
        	
 }
 
@@ -76,12 +73,12 @@ int main(int argc, char*argv[])
 
         if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API Array Copy");
 
-	// Specify texture
+	// Step 1. Specify texture
 	struct cudaResourceDesc resDesc;
 	memset(&resDesc, 0, sizeof(resDesc));
 	resDesc.resType = cudaResourceTypeArray;
 	resDesc.res.array.array = cu_array;
-	//Step 2 Specify texture object parameters
+	// Step 2. Specify texture object parameters
 	struct cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
 	texDesc.addressMode[0] = cudaAddressModeClamp;
@@ -90,25 +87,25 @@ int main(int argc, char*argv[])
 	texDesc.readMode = cudaReadModeElementType;
 	texDesc.normalizedCoords = 0;
 
-	// Create texture object
+	// Step 3. Create texture object
 	cudaTextureObject_t texObj = 0;
 	cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
 
-        if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API Bind Texture");
+	if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API Bind Texture");
 	cudaMalloc(&d_imageHistogram, noOfHistogram*sizeof(unsigned int) );
 
-        dim3 dimBlock(BLOCK_SIZE_X, BLOCK_SIZE_Y,1);
-        dim3 dimGrid(width/dimBlock.x,height/dimBlock.y,1);
+	dim3 dimBlock(BLOCK_SIZE_X, BLOCK_SIZE_Y,1);
+	dim3 dimGrid(width/dimBlock.x,height/dimBlock.y,1);
 	printf("\n Launching grid with blocks [%d][%d] ", dimGrid.x,dimGrid.y);
 
-        calculateHistogram<<<dimGrid, dimBlock>>>(d_imageHistogram,width,height, texObj);
+	calculateHistogram<<<dimGrid, dimBlock>>>(d_imageHistogram,width,height, texObj);
 
-        returnValue = (cudaError_t)(returnValue | cudaThreadSynchronize());
+	returnValue = (cudaError_t)(returnValue | cudaDeviceSynchronize());
 
 	returnValue = (cudaError_t)(returnValue |cudaMemcpy (imageHistogram , d_imageHistogram, noOfHistogram*sizeof(unsigned int), cudaMemcpyDeviceToHost ));
-        if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API kernel");
+    if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API kernel");
 
-	// Step 4: Destroy texture object
+	// Step 5: Destroy texture object
 	cudaDestroyTextureObject(texObj);
 
 	printf("\n Histogram perr section is as follows: ");

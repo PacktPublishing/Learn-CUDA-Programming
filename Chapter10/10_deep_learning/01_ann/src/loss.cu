@@ -39,9 +39,6 @@ softmax_loss_kernel(float *reduced_loss, float *predict, float *target, float *w
     float loss = 0.f;
 
     // each thread calculate entropy for each data and accumulate to shared memory
-    if (batch_idx > 0)
-        return;
-
     for (int c = 0; c < num_outputs; c++)
         loss += target[batch_idx * num_outputs + c] * logf(predict[batch_idx * num_outputs + c]);
     workspace[batch_idx] = -loss;
@@ -102,7 +99,8 @@ float CrossEntropyLoss::loss(Blob<float> *predict, Blob<float> *target)
                 (d_loss_, predict->cuda(), target->cuda(), d_workspace_, batch_size, num_outputs);
     cudaMemcpy(&h_loss_, d_loss_, sizeof(float), cudaMemcpyDeviceToHost);
     
-    return h_loss_;
+    // batch mean loss 
+    return h_loss_ / float(batch_size);
 }
 
 

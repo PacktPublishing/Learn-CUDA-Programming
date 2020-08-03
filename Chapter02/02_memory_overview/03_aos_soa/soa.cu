@@ -8,7 +8,8 @@
 
 #define IMG_SIZE 1048576
 
-struct Coefficients_AOS {
+// Coefficients with Structure of Array
+struct Coefficients_SOA {
   int* r;
   int* b;
   int* g;
@@ -21,20 +22,19 @@ struct Coefficients_AOS {
 
 
 __global__
-void complicatedCalculation(Coefficients_AOS  data)
+void complicatedCalculation(Coefficients_SOA  data)
 {
   int i = blockIdx.x*blockDim.x + threadIdx.x;
-
-
   int grayscale = (data.r[i] + data.g[i] + data.b[i])/data.maxVal[i];
   int hue_sat = data.hue[i] * data.saturation[i] / data.minVal[i];
+
   data.finalVal[i] = grayscale*hue_sat; 
 }
 
 void complicatedCalculation()
 {
 
-  Coefficients_AOS d_x;
+  Coefficients_SOA d_x;
 
   cudaMalloc(&d_x.r, IMG_SIZE*sizeof(int)); 
   cudaMalloc(&d_x.g, IMG_SIZE*sizeof(int)); 
@@ -45,11 +45,9 @@ void complicatedCalculation()
   cudaMalloc(&d_x.minVal, IMG_SIZE*sizeof(int)); 
   cudaMalloc(&d_x.finalVal, IMG_SIZE*sizeof(int)); 
 
-
   int num_blocks = IMG_SIZE/NUM_THREADS;
 
   complicatedCalculation<<<num_blocks,NUM_THREADS>>>(d_x);
-
   
   cudaFree(d_x.r);
   cudaFree(d_x.g);

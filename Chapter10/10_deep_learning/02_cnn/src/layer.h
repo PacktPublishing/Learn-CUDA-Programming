@@ -150,8 +150,8 @@ class Conv2D: public Layer
     std::array<int, 4> output_size_;
 
     // convolution
-    cudnnConvolutionDescriptor_t conv_desc_;
-
+    cudnnConvolutionDescriptor_t    conv_desc_;
+    
     cudnnConvolutionFwdAlgo_t       conv_fwd_algo_;
     cudnnConvolutionBwdDataAlgo_t   conv_bwd_data_algo_;
     cudnnConvolutionBwdFilterAlgo_t conv_bwd_filter_algo_;

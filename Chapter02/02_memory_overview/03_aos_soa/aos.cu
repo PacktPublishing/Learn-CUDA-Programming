@@ -8,7 +8,8 @@
 
 #define IMG_SIZE 1048576
 
-struct Coefficients_SOA {
+// Coefficients with Array of Structure
+struct Coefficients_AOS {
   int r;
   int b;
   int g;
@@ -21,7 +22,7 @@ struct Coefficients_SOA {
 
 
 __global__
-void complicatedCalculation(Coefficients_SOA*  data)
+void complicatedCalculation(Coefficients_AOS*  data)
 {
   int i = blockIdx.x*blockDim.x + threadIdx.x;
 
@@ -34,9 +35,9 @@ void complicatedCalculation(Coefficients_SOA*  data)
 void complicatedCalculation()
 {
 
-  Coefficients_SOA* d_x;
+  Coefficients_AOS* d_x;
 
-  cudaMalloc(&d_x, IMG_SIZE*sizeof(Coefficients_SOA)); 
+  cudaMalloc(&d_x, IMG_SIZE*sizeof(Coefficients_AOS)); 
 
   int num_blocks = IMG_SIZE/NUM_THREADS;
 

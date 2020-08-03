@@ -126,64 +126,6 @@ class Softmax: public Layer
     CrossEntropyLoss loss_;
 };
 
-class Conv2D: public Layer
-{
-    public:
-    Conv2D(std::string name,
-                int out_channels,
-                int kernel_size,
-                int stride=1,
-                int padding=0,
-                int dilation=1);
-    ~Conv2D();
-
-    Blob<float> *forward(Blob<float> *input);
-    Blob<float> *backward(Blob<float> *grad_output);
-
-    private:
-    int out_channels_;
-    int kernel_size_;
-    int stride_;
-    int padding_;
-    int dilation_;
-    
-    std::array<int, 4> output_size_;
-
-    // convolution
-    cudnnConvolutionDescriptor_t conv_desc_;
-
-    cudnnConvolutionFwdAlgo_t       conv_fwd_algo_;
-    cudnnConvolutionBwdDataAlgo_t   conv_bwd_data_algo_;
-    cudnnConvolutionBwdFilterAlgo_t conv_bwd_filter_algo_;
-
-    size_t workspace_size = 0;
-    void** d_workspace = nullptr;
-    void set_workspace();
-};
-
-class Pooling: public Layer
-{
-    public: 
-    Pooling(std::string name, 
-            int kernel_size, 
-            int padding, 
-            int stride,
-            cudnnPoolingMode_t mode);
-    ~Pooling();
-
-    Blob<float> *forward(Blob<float> *input);
-    Blob<float> *backward(Blob<float> *grad_output);
-
-    private:
-    int kernel_size_;
-    int padding_;
-    int stride_;
-    cudnnPoolingMode_t       mode_;
-
-    std::array<int, 4> output_size_;
-    cudnnPoolingDescriptor_t pool_desc_;
-};
-
 } // namespace cudl
 
 #endif // _LAYER_H_

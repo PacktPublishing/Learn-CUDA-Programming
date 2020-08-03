@@ -1,21 +1,16 @@
 #include<stdio.h>
 #include"scrImagePgmPpmPackage.h"
 
-//Step 1: Declare the texture memory
-texture<unsigned char, 2, cudaReadModeElementType> tex;
-
-
 //Kernel which calculate the resized image
 __global__ void createResizedImage(unsigned char *imageScaledData, int scaled_width, float scale_factor, cudaTextureObject_t texObj)
 {
-        const unsigned int tidX = blockIdx.x*blockDim.x + threadIdx.x;
-        const unsigned int tidY = blockIdx.y*blockDim.y + threadIdx.y;
+	const unsigned int tidX = blockIdx.x*blockDim.x + threadIdx.x;
+	const unsigned int tidY = blockIdx.y*blockDim.y + threadIdx.y;
 	const unsigned index = tidY*scaled_width+tidX;
        	
-	//Step 3: Read the texture memory from your texture reference in CUDA Kernel
+	// Step 4: Read the texture memory from your texture reference in CUDA Kernel
 	imageScaledData[index] = tex2D<unsigned char>(texObj,(float)(tidX*scale_factor),(float)(tidY*scale_factor));
 }
-
 
 int main(int argc, char*argv[])
 {
@@ -32,8 +27,7 @@ int main(int argc, char*argv[])
 	//Create a channel Description to be used while linking to the tecture
 	cudaArray* cu_array;
 	cudaChannelFormatKind kind = cudaChannelFormatKindUnsigned;
-        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 0, 0, 0, kind);
-
+	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 0, 0, 0, kind);
 
 	get_PgmPpmParams(inputStr, &height, &width);	//getting height and width of the current image
 	data = (unsigned char*)malloc(height*width*sizeof(unsigned char));
@@ -49,14 +43,15 @@ int main(int argc, char*argv[])
  	returnValue = cudaMallocArray( &cu_array, &channelDesc, width, height);
 	returnValue = (cudaError_t)(returnValue | cudaMemcpyToArray( cu_array, 0, 0, data, height*width*sizeof(unsigned char), cudaMemcpyHostToDevice));
 
-        if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API Array Copy");
+	if(returnValue != cudaSuccess)
+		printf("\n Got error while running CUDA API Array Copy");
 
-	// Specify texture
+	// Step 1. Specify texture
 	struct cudaResourceDesc resDesc;
 	memset(&resDesc, 0, sizeof(resDesc));
 	resDesc.resType = cudaResourceTypeArray;
 	resDesc.res.array.array = cu_array;
-	//Step 2 Specify texture object parameters
+	// Step 2. Specify texture object parameters
 	struct cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
 	texDesc.addressMode[0] = cudaAddressModeClamp;
@@ -65,26 +60,28 @@ int main(int argc, char*argv[])
 	texDesc.readMode = cudaReadModeElementType;
 	texDesc.normalizedCoords = 0;
 
-	// Create texture object
+	// Step 3: Create texture object
 	cudaTextureObject_t texObj = 0;
 	cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
 
-        if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API Bind Texture");
+	if(returnValue != cudaSuccess) 
+		printf("\n Got error while running CUDA API Bind Texture");
+	
 	cudaMalloc(&d_scaled_data, scaled_height*scaled_width*sizeof(unsigned char) );
 
-        dim3 dimBlock(32, 32,1);
-        dim3 dimGrid(scaled_width/dimBlock.x,scaled_height/dimBlock.y,1);
+	dim3 dimBlock(32, 32,1);
+	dim3 dimGrid(scaled_width/dimBlock.x,scaled_height/dimBlock.y,1);
 	printf("\n Launching grid with blocks [%d][%d] ", dimGrid.x,dimGrid.y);
 
-        createResizedImage<<<dimGrid, dimBlock>>>(d_scaled_data,scaled_width,1/scaling_ratio, texObj);
+	createResizedImage<<<dimGrid, dimBlock>>>(d_scaled_data,scaled_width,1/scaling_ratio, texObj);
 
-
-        returnValue = (cudaError_t)(returnValue | cudaThreadSynchronize());
+	returnValue = (cudaError_t)(returnValue | cudaDeviceSynchronize());
 
 	returnValue = (cudaError_t)(returnValue |cudaMemcpy (scaled_data , d_scaled_data, scaled_height*scaled_width*sizeof(unsigned char), cudaMemcpyDeviceToHost ));
-        if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API kernel");
+	if(returnValue != cudaSuccess) 
+		printf("\n Got error while running CUDA API kernel");
 
-	// Step 4: Destroy texture object
+	// Step 5: Destroy texture object
 	cudaDestroyTextureObject(texObj);
 	
 	scr_write_pgm( outputStr, scaled_data, scaled_height, scaled_width, "####" ); //storing the image with the detections
