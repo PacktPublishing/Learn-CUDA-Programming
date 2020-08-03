@@ -44,13 +44,15 @@ __global__ void sgemm_kernel_v2(const float *A, const float *B, float *C, int M,
     for (int k = 0; k < K; k += BLOCK_DIM)
     {
         s_tile_A[tid_y][tid_x] = A[ (bid_y + tid_y) * K + tid_x + k ]; // Get sub-matrix from A
-        s_tile_B[tid_y][tid_x] = B[ k * N + bid_x + tid_x ]; // Get sub-matrix from B
+        s_tile_B[tid_y][tid_x] = B[ (k*BLOCK_DIM + tid_y) * N + bid_x + tid_x ]; // Get sub-matrix from B
 
         __syncthreads();
 
         // compute gemm operation with tiles
         for (int e = 0; e < BLOCK_DIM; e++)
             element_c += s_tile_A[tid_y][e] * s_tile_B[e][tid_x];
+	    
+	__syncthreads();
     }
 
     C[(bid_y + tid_y) * N + (bid_x + tid_x)] = \
@@ -59,9 +61,9 @@ __global__ void sgemm_kernel_v2(const float *A, const float *B, float *C, int M,
 
 void sgemm_gold(const float *A, const float *B, float *C, int M, int N, int K, float alpha, float beta)
 {
-    float element_c = 0.f;
     for (int row = 0; row < M; row++) {
         for (int col = 0; col < N; col++) {
+	    float element_c = 0.f;
             for (int e = 0; e < K; e++) {
                 element_c += A[row * K + e] * B[e * N + col];
 	        }
@@ -73,7 +75,7 @@ void sgemm_gold(const float *A, const float *B, float *C, int M, int N, int K, f
 void random_init(float *data, int length)
 {
     for (int i = 0; i < length; i++) {
-        data[i] = (rand() & 0xFF) / (float)RAND_MAX;
+        data[i] = (rand() & 0xFFFF) / (float)RAND_MAX;
     }
 }
 
