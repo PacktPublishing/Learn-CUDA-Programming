@@ -75,7 +75,7 @@ void sgemm_gold(const float *A, const float *B, float *C, int M, int N, int K, f
 void random_init(float *data, int length)
 {
     for (int i = 0; i < length; i++) {
-        data[i] = (rand() & 0xFF) / (float)RAND_MAX;
+        data[i] = (rand() & 0xFFFF) / (float)RAND_MAX;
     }
 }
 
