@@ -593,21 +593,16 @@ void Conv2D::set_workspace()
 		input_desc_, filter_desc_, conv_desc_, output_desc_,
 		algo_max_count, 0, fwd_algo_perf_results));
 	conv_fwd_algo_ = fwd_algo_perf_results[0].algo;
-	checkCudnnErrors(cudnnGetConvolutionForwardWorkspaceSize(cuda_->cudnn(),
-		input_desc_, filter_desc_, conv_desc_, output_desc_,
-		conv_fwd_algo_, &temp_size));
 #else
 	checkCudnnErrors(cudnnGetConvolutionForwardAlgorithm(cuda_->cudnn(),
 		input_desc_, filter_desc_, conv_desc_, output_desc_,
 		CUDNN_CONVOLUTION_FWD_PREFER_FASTEST, 0, &conv_fwd_algo_));
+#endif
 	checkCudnnErrors(cudnnGetConvolutionForwardWorkspaceSize(cuda_->cudnn(),
 		input_desc_, filter_desc_, conv_desc_, output_desc_,
 		conv_fwd_algo_, &temp_size));
-#endif
 	workspace_size = std::max(workspace_size, temp_size);
 
-
-	// todo trainable check
 	// bwd - filter
 #if CUDNN_MAJOR == 8
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterAlgorithmMaxCount(cuda_->cudnn(), &algo_max_count));
@@ -616,17 +611,14 @@ void Conv2D::set_workspace()
 		input_desc_, output_desc_, conv_desc_, filter_desc_,
 		algo_max_count, 0, bwd_filter_algo_perf_results));
 	conv_bwd_filter_algo_ = bwd_filter_algo_perf_results[0].algo;
-	checkCudnnErrors(cudnnGetConvolutionBackwardFilterWorkspaceSize(cuda_->cudnn(),
-		input_desc_, output_desc_, conv_desc_, filter_desc_,
-		conv_bwd_filter_algo_, &temp_size));
 #else
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterAlgorithm(cuda_->cudnn(),
 		input_desc_, output_desc_, conv_desc_, filter_desc_,
 		CUDNN_CONVOLUTION_BWD_FILTER_PREFER_FASTEST, 0, &conv_bwd_filter_algo_));
+#endif
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterWorkspaceSize(cuda_->cudnn(),
 		input_desc_, output_desc_, conv_desc_, filter_desc_,
 		conv_bwd_filter_algo_, &temp_size));
-#endif
 	workspace_size = std::max(workspace_size, temp_size);
 
 	// bwd - data
@@ -637,17 +629,14 @@ void Conv2D::set_workspace()
 		filter_desc_, output_desc_, conv_desc_, input_desc_,
 		algo_max_count, 0, bwd_data_algo_perf_results));
 	conv_bwd_data_algo_ = bwd_data_algo_perf_results[0].algo;
-	checkCudnnErrors(cudnnGetConvolutionBackwardDataWorkspaceSize(cuda_->cudnn(),
-		filter_desc_, output_desc_, conv_desc_, input_desc_,
-		conv_bwd_data_algo_, &temp_size));
 #else
 	checkCudnnErrors(cudnnGetConvolutionBackwardDataAlgorithm(cuda_->cudnn(), 
 		filter_desc_, output_desc_, conv_desc_, input_desc_, 
 		CUDNN_CONVOLUTION_BWD_DATA_PREFER_FASTEST, 0, &conv_bwd_data_algo_));
+#endif
 	checkCudnnErrors(cudnnGetConvolutionBackwardDataWorkspaceSize(cuda_->cudnn(),
 		filter_desc_, output_desc_, conv_desc_, input_desc_,
 		conv_bwd_data_algo_, &temp_size));
-#endif
 	workspace_size = std::max(workspace_size, temp_size);
 
 	if (workspace_size > 0)
@@ -715,17 +704,10 @@ Blob<float> *Conv2D::forward(Blob<float> *input)
 		}
 	}
 
-#if CUDNN_MAJOR == 8
-	checkCudnnErrors(cudnnConvolutionForward(cuda_->cudnn(),
-		&cuda_->one,  input_desc_,  input_->cuda(),
-		filter_desc_, weights_->cuda(), conv_desc_, conv_fwd_algo_, d_workspace,  workspace_size,
-		&cuda_->zero, output_desc_, output_->cuda()));
-#else
 	checkCudnnErrors(cudnnConvolutionForward(cuda_->cudnn(),
 		&cuda_->one, input_desc_, input_->cuda(),
 		filter_desc_, weights_->cuda(), conv_desc_, conv_fwd_algo_, d_workspace, workspace_size,
 		&cuda_->zero, output_desc_, output_->cuda()));
-#endif
 
 	checkCudnnErrors(cudnnAddTensor(cuda_->cudnn(), 
 		&cuda_->one, bias_desc_, biases_->cuda(), 
@@ -763,28 +745,6 @@ Blob<float> *Conv2D::backward(Blob<float> *grad_output)
 			&cuda_->zero, 
 			bias_desc_,   grad_biases_->cuda()));
 
-#if CUDNN_MAJOR == 8
-	// gradients of weights 
-	checkCudnnErrors(
-		cudnnConvolutionBackwardFilter(cuda_->cudnn(),
-			&cuda_->one,
-			input_desc_, input_->cuda(),
-			output_desc_, grad_output_->cuda(),
-			conv_desc_, conv_bwd_filter_algo_, d_workspace, workspace_size,
-			&cuda_->zero,
-			filter_desc_, grad_weights_->cuda()));
-
-	// gradients of input data
-	if (!gradient_stop_)
-		checkCudnnErrors(
-			cudnnConvolutionBackwardData(cuda_->cudnn(),
-				&cuda_->one,
-				filter_desc_, weights_->cuda(),
-				output_desc_, grad_output->cuda(),
-				conv_desc_, conv_bwd_data_algo_, d_workspace, workspace_size,
-				&cuda_->zero,
-				input_desc_, grad_input_->cuda()));
-#else // CUDNN_MAJOR <= 7
 	// gradients of weights 
 	checkCudnnErrors(
 		cudnnConvolutionBackwardFilter(cuda_->cudnn(),
@@ -805,7 +765,6 @@ Blob<float> *Conv2D::backward(Blob<float> *grad_output)
 				conv_desc_, conv_bwd_data_algo_, d_workspace, workspace_size,
 				&cuda_->zero, 
 				input_desc_, grad_input_->cuda()));
-#endif
 
 #if (DEBUG_CONV & 0x02)
 	std::cout << name_ << "[BACKWARD]" << std::endl;
