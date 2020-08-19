@@ -34,7 +34,6 @@ __global__ void
 softmax_loss_kernel(float *reduced_loss, float *predict, float *target, float *workspace, int batch_size, int num_outputs)
 {
     int batch_idx = blockDim.x * blockIdx.x + threadIdx.x;
-    int stride = gridDim.x * blockDim.x;
 
     extern __shared__ float s_data[];
     float loss = 0.f;
