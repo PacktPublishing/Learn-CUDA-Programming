@@ -5,14 +5,22 @@ sudo apt-get install -y --no-install-recommends \
     libatlas-base-dev gfortran libeigen3-dev \
     libgtkglext1 libgtkglext1-dev
 
-# We are install OpenCV 4.1.1
-OPENCV_VERSION=4.1.1
+# Setting OpenCV version to install
+OPENCV_VERSION=${1:-'4.4.0'}
 OPENCV_DIR=opencv
 
 # Download OpenCV and contrib source codes
-mkdir -p ${OPENCV_DIR}
-wget -O ${OPENCV_DIR}/opencv-${OPENCV_VERSION}.tar.gz https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.tar.gz
-wget -O ${OPENCV_DIR}/opencv_contrib-${OPENCV_VERSION}.tar.gz https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.tar.gz
+if [ ! -f "${OPENCV_DIR}" ]; then
+    mkdir -p ${OPENCV_DIR}
+fi
+if [ ! -f "${OPENCV_DIR}/opencv-${OPENCV_VERSION}.tar.gz" ]; then
+    wget -O ${OPENCV_DIR}/opencv-${OPENCV_VERSION}.tar.gz \
+        https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.tar.gz
+fi
+if [ ! -f "${OPENCV_DIR}/opencv_contrib-${OPENCV_VERSION}.tar.gz" ]; then
+    wget -O ${OPENCV_DIR}/opencv_contrib-${OPENCV_VERSION}.tar.gz \
+        https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.tar.gz
+fi
 
 # Untar the files
 tar -C ${OPENCV_DIR} -xzf ${OPENCV_DIR}/opencv-${OPENCV_VERSION}.tar.gz
@@ -30,9 +38,9 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
     -D ENABLE_FAST_MATH=1 \
     -D CUDA_FAST_MATH=1 \
     -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-${OPENCV_VERSION}/modules \
-    -D WITH_CUBLAS=1 ..
+    -D WITH_CUBLAS=1 .. \
     -D PYTHON_DEFAULT_EXECUTABLE=`which python3` \
-    -D INSTALL_PYTHON_EXAMPLES=ON \
-    -D BUILD_EXAMPLES=ON ..
+    -D INSTALL_PYTHON_EXAMPLES=OFF \
+    -D BUILD_EXAMPLES=OFF ..
 make -j$(nproc)
 sudo make install -j$(nproc)
