@@ -1,12 +1,12 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=vec_addition
+TARGET=vector_addition_gpu_thread_block
 
 INCLUDES= -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo
 
-IS_CUDA_11:=$(shell echo `nvcc --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75

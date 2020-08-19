@@ -6,7 +6,7 @@ TARGET=image_scaling
 INCLUDES= -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo
 
-IS_CUDA_11:=$(shell echo `nvcc --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75
@@ -17,13 +17,16 @@ $(foreach sm, ${SMS}, $(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=s
 
 all : ${TARGET}
 
-${OBJ_DIR}/%.o: ${SRC_DIR}/%.cpp ${INCS}
-	$(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -c $< -o $@
-${OBJ_DIR}/%.o: ${SRC_DIR}/%.cu ${INCS}
-	$(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -c $< -o $@
+INCS = scrImagePgmPpmPackage.h
 
-image_scaling: image_scaling.cu
-	${NVCC} ${INCLUDES} ${ALL_CCFLAGS} ${GENCODE_FLAGS} -o $@ $<
+scrImagePgmPpmPackage.o: scrImagePgmPpmPackage.cpp ${INCS}
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+image_scaling.o: image_scaling.cu ${INCS}
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+image_scaling: scrImagePgmPpmPackage.o image_scaling.o
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+
 
 clean:
 	rm -f ${TARGET} 

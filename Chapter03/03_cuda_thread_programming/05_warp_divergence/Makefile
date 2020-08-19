@@ -1,12 +1,12 @@
 CUDA_PATH=/usr/local/cuda
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
-TARGET=reduction
+TARGET=reduction_sequential reduction_interleaving
 
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo # --resource-usage
 
-IS_CUDA_11:=$(shell echo `nvcc --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75
@@ -17,21 +17,24 @@ $(foreach sm, ${SMS}, $(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=s
 
 # Openmp
 LIBRARIES += -lgomp
-ALL_CCFLAGS += -g -Xcompiler -fopenmp -rdc=true ${NVCC_FLAGS}
+ALL_CCFLAGS += -g -Xcompiler -fopenmp -rdc=true ${NVCC_FLAGS} 
 
 all : ${TARGET}
 
-reduction_kernel_1.o: reduction_kernel_1.cu
+reduction_kernel_interleaving.o: reduction_kernel_interleaving.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-reduction_kernel_2.o: reduction_kernel_2.cu
+reduction_kernel_sequential.o: reduction_kernel_sequential.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 reduction.o: reduction.cpp
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-reduction: reduction.o reduction_kernel_1.o reduction_kernel_2.o
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+reduction_sequential: reduction.o reduction_kernel_sequential.o
+	$(EXEC) $(NVCC) ${INCLUDES} -o $@ $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) $+
+
+reduction_interleaving: reduction.o reduction_kernel_interleaving.o
+	$(EXEC) $(NVCC) ${INCLUDES} -o $@ $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) $+
 
 clean:
 	rm -f ${TARGET} *.o

@@ -3,10 +3,10 @@ HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
 TARGET=openmp openmp_default_stream openmp_gpus
 
-INCLUDES = -I${CUDA_PATH}/samples/common
+INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 -lineinfo # --resource-usage
 
-IS_CUDA_11:=$(shell echo `nvcc --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75

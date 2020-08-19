@@ -6,7 +6,7 @@ TARGET=imageFilter statisticsNPP
 INCLUDES = -I${CUDA_PATH}/samples/common/inc
 NVCC_FLAGS=-m64 # --resource-usage
 
-IS_CUDA_11:=$(shell echo `nvcc --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75
@@ -16,7 +16,7 @@ endif
 $(foreach sm, ${SMS}, $(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
 # Openmp
-LIBRARIES += -lnppc -lnppif -lnppisu -lnppig -lnppicom -lnpps -lfreeimage
+LIBRARIES += -lnppc -lnppif -lnppisu -lnppig -lnpps -lfreeimage
 ALL_CCFLAGS += -std=c++11 $(INCLUDES) -L/usr/local/cuda/lib
 
 all : ${TARGET}
