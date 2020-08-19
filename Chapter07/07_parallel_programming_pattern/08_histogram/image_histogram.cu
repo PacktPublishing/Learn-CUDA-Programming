@@ -69,7 +69,7 @@ int main(int argc, char*argv[])
 
 	//Allocate CUDA Array
  	returnValue = cudaMallocArray( &cu_array, &channelDesc, width, height);
-	returnValue = (cudaError_t)(returnValue | cudaMemcpyToArray( cu_array, 0, 0, data, height*width*sizeof(unsigned char), cudaMemcpyHostToDevice));
+	 returnValue = (cudaError_t)(returnValue | cudaMemcpy( cu_array, data, height * width * sizeof(unsigned char), cudaMemcpyHostToDevice));
 
         if(returnValue != cudaSuccess) printf("\n Got error while running CUDA API Array Copy");
 
