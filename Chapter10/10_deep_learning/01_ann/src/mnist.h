@@ -51,9 +51,9 @@ class MNIST
     std::string test_label_file_    = "t10k-labels-idx1-ubyte";
 #elif _WIN32
     std::string train_dataset_file_ = "train-images.idx3-ubyte";
-    std::string train_label_file_ = "train-labels.idx1-ubyte";
-    std::string test_dataset_file_ = "t10k-images.idx3-ubyte";
-    std::string test_label_file_ = "t10k-labels.idx1-ubyte";
+    std::string train_label_file_ 	= "train-labels.idx1-ubyte";
+    std::string test_dataset_file_ 	= "t10k-images.idx3-ubyte";
+    std::string test_label_file_ 	= "t10k-labels.idx1-ubyte";
 #endif
 
     // container
