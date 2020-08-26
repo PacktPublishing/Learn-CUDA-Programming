@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 {
     /* configure the network */
     int batch_size_train = 256;
-    int num_steps_train = 2400;
+    int num_steps_train = 1600;
     int monitoring_step = 200;
 
     double learning_rate = 0.02f;
@@ -38,8 +38,10 @@ int main(int argc, char* argv[])
     // step 2. model initialization
     Network model;
     model.add_layer(new Conv2D("conv1", 20, 5));
+    model.add_layer(new Activation("relu", CUDNN_ACTIVATION_RELU));
     model.add_layer(new Pooling("pool", 2, 0, 2, CUDNN_POOLING_MAX));
     model.add_layer(new Conv2D("conv2", 50, 5));
+    model.add_layer(new Activation("relu", CUDNN_ACTIVATION_RELU));
     model.add_layer(new Pooling("pool", 2, 0, 2, CUDNN_POOLING_MAX));
     model.add_layer(new Dense("dense1", 500));
     model.add_layer(new Activation("relu", CUDNN_ACTIVATION_RELU));
@@ -128,8 +130,8 @@ int main(int argc, char* argv[])
         nvtxRangePushA(nvtx_message.c_str());
 
         // update shared buffer contents
-		test_data->to(cuda);
-		test_target->to(cuda);
+        test_data->to(cuda);
+        test_target->to(cuda);
 
         // forward
         model.forward(test_data);
