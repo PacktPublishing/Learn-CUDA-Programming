@@ -3,7 +3,8 @@
 #include "src/layer.h"
 
 #include <iomanip>
-#include <nvToolsExt.h>
+#include <cuda_profiler_api.h>
+#include <nvtx3/nvToolsExt.h>
 
 using namespace cudl;
 
@@ -11,7 +12,7 @@ int main(int argc, char* argv[])
 {
     /* configure the network */
     int batch_size_train = 256;
-    int num_steps_train = 2400;
+    int num_steps_train = 1600;
     int monitoring_step = 200;
 
     double learning_rate = 0.02f;
@@ -45,6 +46,9 @@ int main(int argc, char* argv[])
     if (load_pretrain)
         model.load_pretrain();
     model.train();
+
+    // start Nsight System profile
+    cudaProfilerStart();
 
     // step 3. train
     int step = 0;
@@ -86,7 +90,9 @@ int main(int argc, char* argv[])
             float loss = model.loss(train_target);
             float accuracy =  100.f * tp_count / monitoring_step / batch_size_train;
             
-            std::cout << "step: " << std::right << std::setw(4) << step << ", loss: " << std::left << std::setw(5) << std::fixed << std::setprecision(3) << loss << ", accuracy: " << accuracy << "%" << std::endl;
+            std::cout << "step: " << std::right << std::setw(4) << step << \
+                         ", loss: " << std::left << std::setw(5) << std::fixed << std::setprecision(3) << loss << \
+                         ", accuracy: " << accuracy << "%" << std::endl;
 
             tp_count = 0;
         }
@@ -118,8 +124,8 @@ int main(int argc, char* argv[])
         nvtxRangePushA(nvtx_message.c_str());
 
         // update shared buffer contents
-		test_data->to(cuda);
-		test_target->to(cuda);
+        test_data->to(cuda);
+        test_target->to(cuda);
 
         // forward
         model.forward(test_data);
@@ -131,6 +137,9 @@ int main(int argc, char* argv[])
         // nvtx profiling stop
         nvtxRangePop();
     }
+
+    // stop Nsight System profiling
+    cudaProfilerStop();
 
     // step 4. calculate loss and accuracy
     float loss = model.loss(test_target);
