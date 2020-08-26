@@ -24,6 +24,8 @@ namespace cudl
 #define DEBUG_LOSS      0
 #define DEBUG_ACCURACY  0
 
+#define DEBUG_FIND_ALGO 0
+
 /* CUDA API error return checker */
 #ifndef checkCudaErrors
 #define checkCudaErrors(err)                                                                        \
