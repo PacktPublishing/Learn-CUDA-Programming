@@ -1,5 +1,4 @@
 CUDA_PATH=/usr/local/cuda
-# CUDA_PATH=/cm/extra/apps/CUDA.linux86-64/10.0.130_410.48
 HOST_COMPILER ?= g++
 NVCC=${CUDA_PATH}/bin/nvcc -ccbin ${HOST_COMPILER}
 TARGET=train
@@ -7,7 +6,7 @@ TARGET=train
 INCLUDES = -I${CUDA_PATH}/samples/common/inc -I$(CUDA_PATH)/include
 NVCC_FLAGS=-G --resource-usage -Xcompiler -rdynamic -Xcompiler -fopenmp -rdc=true -lnvToolsExt
 
-IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=${shell expr `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0}
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75
