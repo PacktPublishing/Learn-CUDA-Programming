@@ -11,13 +11,13 @@ using namespace cudl;
 
 Network::Network()
 {
-	// nothing
+	// do nothing
 }
 
 Network::~Network()
 {
 	// destroy network
-	for (auto layer: layers_)
+	for (auto layer : layers_)
 		delete layer;
 
 	// terminate CUDA context
@@ -45,6 +45,7 @@ Blob<float> *Network::forward(Blob<float> *input)
 		std::cout << "[[Forward ]][[ " << std::setw(7) << layer->get_name() << " ]]\t(" << output_->n() << ", " << output_->c() << ", " << output_->h() << ", " << output_->w() << ")\t";
 		#endif // DEBUG_FORWARD
 
+		layer->fwd_initialize(output_);
 		output_ = layer->forward(output_);
 
 		#if (DEBUG_FORWARD)
@@ -84,6 +85,7 @@ void Network::backward(Blob<float> *target)
 		std::cout << "[[Backward]][[ " << std::setw(7) << (*layer)->get_name() << " ]]\t(" << gradient->n() << ", " << gradient->c() << ", " << gradient->h() << ", " << gradient->w() << ")\t";
 #endif // DEBUG_BACKWARD
 
+		(*layer)->bwd_initialize(gradient);
 		gradient = (*layer)->backward(gradient);
 
 #if (DEBUG_BACKWARD)
