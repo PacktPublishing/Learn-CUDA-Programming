@@ -16,7 +16,7 @@ class Layer
 {
 public:
     Layer();
-    ~Layer();
+    virtual ~Layer();
 
     virtual Blob<float> *forward(Blob<float> *input) = 0;
     virtual Blob<float> *backward(Blob<float> *grad_input) = 0;
@@ -36,6 +36,9 @@ public:
     void unfreeze() { freeze_ = false;}
 
 protected:
+    virtual bool fwd_initialize(Blob<float> *input) = 0;
+    virtual bool bwd_initialize(Blob<float> *grad_output) = 0;
+
     // name of layer
     std::string name_;
 
@@ -83,12 +86,15 @@ class Dense: public Layer
 {
     public:
     Dense(std::string name, int out_size);
-    ~Dense();
+    virtual ~Dense();
 
-    Blob<float> *forward(Blob<float> *input);
-    Blob<float> *backward(Blob<float> *grad_input);
+    virtual Blob<float> *forward(Blob<float> *input);
+    virtual Blob<float> *backward(Blob<float> *grad_input);
 
-    private: 
+    private:
+    bool fwd_initialize(Blob<float> *input);
+    bool bwd_initialize(Blob<float> *grad_output);
+
     int input_size_ = 0;
     int output_size_= 0;
 
@@ -99,30 +105,36 @@ class Activation: public Layer
 {
     public:
     Activation(std::string name, cudnnActivationMode_t mode, float coef = 0.f);
-    ~Activation();
+    virtual ~Activation();
 
-    Blob<float> *forward(Blob<float> *input);
-    Blob<float> *backward(Blob<float> *grad_input);
+    virtual Blob<float> *forward(Blob<float> *input);
+    virtual Blob<float> *backward(Blob<float> *grad_input);
 
     private:
+    bool fwd_initialize(Blob<float> *input);
+    bool bwd_initialize(Blob<float> *grad_output);
+
     cudnnActivationDescriptor_t act_desc_;
-    cudnnActivationMode_t mode_;
-    float coef_;
+    cudnnActivationMode_t       act_mode_;
+    float                       act_coef_;
 };
 
 class Softmax: public Layer
 {
     public:
     Softmax(std::string name);
-    ~Softmax();
+    virtual ~Softmax();
 
-    Blob<float> *forward(Blob<float> *input);
-    Blob<float> *backward(Blob<float> *grad_input);
+    virtual Blob<float> *forward(Blob<float> *input);
+    virtual Blob<float> *backward(Blob<float> *grad_input);
 
     float get_loss(Blob<float> *target);
     int   get_accuracy(Blob<float> *target);
 
-    private:
+    protected:
+    bool fwd_initialize(Blob<float> *input);
+    bool bwd_initialize(Blob<float> *grad_output);
+
     CrossEntropyLoss loss_;
 };
 

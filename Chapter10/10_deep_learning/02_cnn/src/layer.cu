@@ -28,13 +28,13 @@ Layer::~Layer()
 	std::cout << "Destroy Layer: " << name_ << std::endl;
 #endif
 
-	if (output_       != nullptr)  delete output_;
-	if (grad_input_   != nullptr)  delete grad_input_;
+	if (output_       != nullptr) { delete output_;       output_       = nullptr; }
+	if (grad_input_   != nullptr) { delete grad_input_;   grad_input_   = nullptr; }
 
-	if (weights_      != nullptr)  delete weights_;
-	if (biases_       != nullptr)  delete biases_;
-	if (grad_weights_ != nullptr)  delete grad_weights_;
-	if (grad_biases_  != nullptr)  delete grad_biases_;
+	if (weights_      != nullptr) { delete weights_;      weights_	    = nullptr; }
+	if (biases_       != nullptr) { delete biases_;	      biases_       = nullptr; }
+	if (grad_weights_ != nullptr) { delete grad_weights_; grad_weights_ = nullptr; }
+	if (grad_biases_  != nullptr) { delete grad_biases_;  grad_biases_  = nullptr; }
 }
 
 void Layer::init_weight_bias(unsigned int seed)
@@ -179,8 +179,7 @@ Dense::Dense(std::string name, int output_size)
 
 Dense::~Dense()
 {
-	if (d_one_vec != nullptr) 
-		cudaFree(d_one_vec);
+	if (d_one_vec != nullptr) { cudaFree(d_one_vec); d_one_vec = nullptr; }
 }
 
 __global__ void init_one_vec(float* d_one_vec, size_t length)
@@ -192,8 +191,10 @@ __global__ void init_one_vec(float* d_one_vec, size_t length)
 	d_one_vec[i] = 1.f;
 }
 
-Blob<float> *Dense::forward(Blob<float> *input)
+bool Dense::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	// initialize weights and biases
 	if (weights_ == nullptr)
 	{
@@ -204,6 +205,7 @@ Blob<float> *Dense::forward(Blob<float> *input)
 		weights_ = new Blob<float>(1, 1, input_size_, output_size_);
 		biases_  = new Blob<float>(1, 1, output_size_);
 
+		is_initialize = true;
 	}
 
 	// initilaize input and output
@@ -241,9 +243,15 @@ Blob<float> *Dense::forward(Blob<float> *input)
 		{
 			/* do nothing */
 		}
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
 
+Blob<float> *Dense::forward(Blob<float> *input)
+{
 	// output = weights^T * input (without biases)
 	checkCublasErrors(
 		cublasSgemm(cuda_->cublas(),
@@ -275,12 +283,16 @@ Blob<float> *Dense::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Dense::backward(Blob<float> *grad_output)
+bool Dense::bwd_initialize(Blob<float> *grad_output)
 {
+	bool is_initialize = false;
+
 	if (grad_weights_ == nullptr)
 	{
 		grad_weights_ = new Blob<float>(weights_->shape());
 		grad_biases_  = new Blob<float>(biases_->shape());
+
+		is_initialize = true;
 	}
 
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
@@ -291,8 +303,15 @@ Blob<float> *Dense::backward(Blob<float> *grad_output)
 			grad_input_   = new Blob<float>(input_->shape());
 		else
 			grad_input_->reset(input_->shape());
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Dense::backward(Blob<float> *grad_output)
+{
 	// db = (dy) * d_one_vec
 	cublasSgemv(cuda_->cublas(),
 			CUBLAS_OP_N,
@@ -343,11 +362,11 @@ Blob<float> *Dense::backward(Blob<float> *grad_output)
 Activation::Activation(std::string name, cudnnActivationMode_t mode, float coef)
 {
 	name_ = name;
-	mode_ = mode;
-	coef_ = coef;
+	act_mode_ = mode;
+	act_coef_ = coef;
 
 	cudnnCreateActivationDescriptor(&act_desc_);
-	cudnnSetActivationDescriptor(act_desc_, mode, CUDNN_PROPAGATE_NAN, coef);
+	cudnnSetActivationDescriptor(act_desc_, act_mode_, CUDNN_PROPAGATE_NAN, act_coef_);
 }
 
 Activation::~Activation()
@@ -355,8 +374,10 @@ Activation::~Activation()
 	cudnnDestroyActivationDescriptor(act_desc_);
 }
 
-Blob<float> *Activation::forward(Blob<float> *input)
+bool Activation::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -369,8 +390,18 @@ Blob<float> *Activation::forward(Blob<float> *input)
 			output_->reset(input->shape());
 
 		output_desc_ = output_->tensor();
+
+		// input_->print( name_ + "::input", false);
+		// output_desc_->print( name_ + "::output", false);
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Activation::forward(Blob<float> *input)
+{
 	cudnnActivationForward(cuda_->cudnn(),
 		act_desc_,
 		&cuda_->one,
@@ -383,8 +414,10 @@ Blob<float> *Activation::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Activation::backward(Blob<float> *grad_output)
+bool Activation::bwd_initialize(Blob<float> *grad_output)
 {
+	bool is_initialize = false;
+
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
 	{
 		grad_output_ = grad_output;
@@ -392,9 +425,16 @@ Blob<float> *Activation::backward(Blob<float> *grad_output)
 		if (grad_input_ == nullptr)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
-			grad_input_->reset(input_->shape());		
+			grad_input_->reset(input_->shape());
+		
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Activation::backward(Blob<float> *grad_output)
+{
 	cudnnActivationBackward(cuda_->cudnn(),
 		act_desc_,
 		&cuda_->one, 
@@ -418,11 +458,13 @@ Softmax::Softmax(std::string name)
 
 Softmax::~Softmax()
 {
-
+	// do nothing
 }
 
-Blob<float> *Softmax::forward(Blob<float> *input)
+bool Softmax::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -435,8 +477,15 @@ Blob<float> *Softmax::forward(Blob<float> *input)
 			output_->reset(input->shape());		
 
 		output_desc_ = output_->tensor();
+
+		is_initialize = false;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Softmax::forward(Blob<float> *input)
+{
 #if (DEBUG_SOFTMAX & 0x01)
 	std::cout << name_ << "[FORWARD]" << std::endl;
 	input_->print(name_ + "::input", true, input->n());
@@ -454,9 +503,9 @@ Blob<float> *Softmax::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Softmax::backward(Blob<float> *target)
+bool Softmax::bwd_initialize(Blob<float> *target)
 {
-	checkCudaErrors(cudaDeviceSynchronize());
+	bool is_initialize = false;
 
 	if (grad_input_ == nullptr || batch_size_ != target->n())
 	{
@@ -464,8 +513,15 @@ Blob<float> *Softmax::backward(Blob<float> *target)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
 		 	grad_input_->reset(input_->shape());
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Softmax::backward(Blob<float> *target)
+{
 	// set grad_input_ as predict
 	checkCudaErrors(cudaMemcpyAsync(grad_input_->cuda(), 
 		output_->cuda(), output_->buf_size(), 
@@ -560,10 +616,15 @@ Conv2D::Conv2D(std::string name,
 
 	cudnnCreateConvolutionDescriptor(&conv_desc_);
 	checkCudnnErrors(cudnnSetConvolution2dDescriptor(conv_desc_,
-		padding_, padding_, stride_,  stride_, dilation_,dilation_,
+		padding_, padding_, stride_,  stride_, dilation_, dilation_,
 		CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 
-	d_workspace = nullptr;
+	// setting cudnn convolution math type
+	// CUDNN_DEFAULT_MATH operates convolution with FP32.
+	// If you use A100, CUDNN utilise tensor cores with TF32.
+	checkCudnnErrors(cudnnSetConvolutionMathType(conv_desc_, CUDNN_DEFAULT_MATH));
+
+	d_workspace_ = nullptr;
 }
 
 Conv2D::~Conv2D()
@@ -573,25 +634,36 @@ Conv2D::~Conv2D()
 	cudnnDestroyConvolutionDescriptor(conv_desc_);
 
 	// terminate internal created blobs
-	if (d_workspace != nullptr)	cudaFree(d_workspace);
+	if (d_workspace_ != nullptr)	{ cudaFree(d_workspace_);	d_workspace_ = nullptr; }
 }
 
 void Conv2D::set_workspace()
 {
 	size_t temp_size = 0;
 
-	cudnnConvolutionFwdAlgoPerf_t 		fwd_algo_perf_results[CUDNN_CONVOLUTION_FWD_ALGO_COUNT];
-	cudnnConvolutionBwdFilterAlgoPerf_t bwd_filter_algo_perf_results[CUDNN_CONVOLUTION_BWD_FILTER_ALGO_COUNT];
-	cudnnConvolutionBwdDataAlgoPerf_t	bwd_data_algo_perf_results[CUDNN_CONVOLUTION_BWD_DATA_ALGO_COUNT];
-
 	// forward
-#if CUDNN_MAJOR == 8
+#if CUDNN_MAJOR >= 7
+	std::vector<cudnnConvolutionFwdAlgoPerf_t> 		 fwd_algo_perf_results(CUDNN_CONVOLUTION_FWD_ALGO_COUNT);
+	std::vector<cudnnConvolutionBwdFilterAlgoPerf_t> bwd_filter_algo_perf_results(CUDNN_CONVOLUTION_BWD_FILTER_ALGO_COUNT);
+	std::vector<cudnnConvolutionBwdDataAlgoPerf_t>	 bwd_data_algo_perf_results(CUDNN_CONVOLUTION_BWD_DATA_ALGO_COUNT);
+
 	int algo_max_count;
+	int returnedAlgoCount = 0;
 	checkCudnnErrors(cudnnGetConvolutionForwardAlgorithmMaxCount(cuda_->cudnn(), &algo_max_count));
+#if (DEBUG_FIND_ALGO & 1)
 	std::cout << this->name_ << ": Available Algorithm Count [FWD]: " << algo_max_count << std::endl;
+	checkCudnnErrors(cudnnFindConvolutionForwardAlgorithm(cuda_->cudnn(),
+		input_desc_, filter_desc_, conv_desc_, output_desc_,
+		algo_max_count, &returnedAlgoCount, &fwd_algo_perf_results[0]));
+	std::cout << "returned algo_count: " << returnedAlgoCount << std::endl;
+	for (int i = 0; i < returnedAlgoCount; i++)
+		std::cout << "fwd algo[" << i << "] time: " << fwd_algo_perf_results[i].time << ", memory: " << fwd_algo_perf_results[i].memory << std::endl;
+#else
 	checkCudnnErrors(cudnnGetConvolutionForwardAlgorithm_v7(cuda_->cudnn(),
 		input_desc_, filter_desc_, conv_desc_, output_desc_,
-		algo_max_count, 0, fwd_algo_perf_results));
+		algo_max_count, &returnedAlgoCount, &fwd_algo_perf_results[0]));
+#endif
+	// shoose the fastest algorithm
 	conv_fwd_algo_ = fwd_algo_perf_results[0].algo;
 #else
 	checkCudnnErrors(cudnnGetConvolutionForwardAlgorithm(cuda_->cudnn(),
@@ -601,15 +673,23 @@ void Conv2D::set_workspace()
 	checkCudnnErrors(cudnnGetConvolutionForwardWorkspaceSize(cuda_->cudnn(),
 		input_desc_, filter_desc_, conv_desc_, output_desc_,
 		conv_fwd_algo_, &temp_size));
-	workspace_size = std::max(workspace_size, temp_size);
+	workspace_size_ = std::max(workspace_size_, temp_size);
 
 	// bwd - filter
-#if CUDNN_MAJOR == 8
+#if CUDNN_MAJOR >= 7
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterAlgorithmMaxCount(cuda_->cudnn(), &algo_max_count));
+#if (DEBUG_FIND_ALGO & 1)
 	std::cout << this->name_ << ": Available Algorithm Count [BWD-filter]: " << algo_max_count << std::endl;
+	checkCudnnErrors(cudnnFindConvolutionBackwardFilterAlgorithm(cuda_->cudnn(),
+		input_desc_, output_desc_, conv_desc_, filter_desc_,
+		algo_max_count, &returnedAlgoCount, &bwd_filter_algo_perf_results[0]));
+	for (int i = 0; i < returnedAlgoCount; i++)
+		std::cout << "bwd filter algo[" << i << "] time: " << fwd_algo_perf_results[i].time << ", memory: " << fwd_algo_perf_results[i].memory << std::endl;
+#else
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterAlgorithm_v7(cuda_->cudnn(),
 		input_desc_, output_desc_, conv_desc_, filter_desc_,
-		algo_max_count, 0, bwd_filter_algo_perf_results));
+		algo_max_count, &returnedAlgoCount, &bwd_filter_algo_perf_results[0]));
+#endif
 	conv_bwd_filter_algo_ = bwd_filter_algo_perf_results[0].algo;
 #else
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterAlgorithm(cuda_->cudnn(),
@@ -619,15 +699,23 @@ void Conv2D::set_workspace()
 	checkCudnnErrors(cudnnGetConvolutionBackwardFilterWorkspaceSize(cuda_->cudnn(),
 		input_desc_, output_desc_, conv_desc_, filter_desc_,
 		conv_bwd_filter_algo_, &temp_size));
-	workspace_size = std::max(workspace_size, temp_size);
+	workspace_size_ = std::max(workspace_size_, temp_size);
 
 	// bwd - data
-#if CUDNN_MAJOR == 8
+#if CUDNN_MAJOR >= 7
 	checkCudnnErrors(cudnnGetConvolutionBackwardDataAlgorithmMaxCount(cuda_->cudnn(), &algo_max_count));
+#if (DEBUG_FIND_ALGO & 1)
 	std::cout << this->name_ << ": Available Algorithm Count [BWD-data]: " << algo_max_count << std::endl;
+	checkCudnnErrors(cudnnFindConvolutionBackwardDataAlgorithm(cuda_->cudnn(),
+		filter_desc_, output_desc_, conv_desc_, input_desc_,
+		algo_max_count, &returnedAlgoCount, &bwd_data_algo_perf_results[0]));
+	for (int i = 0; i < returnedAlgoCount; i++)
+		std::cout << "bwd data algo[" << i << "] time: " << fwd_algo_perf_results[i].time << ", memory: " << fwd_algo_perf_results[i].memory << std::endl;
+#else
 	checkCudnnErrors(cudnnGetConvolutionBackwardDataAlgorithm_v7(cuda_->cudnn(),
 		filter_desc_, output_desc_, conv_desc_, input_desc_,
-		algo_max_count, 0, bwd_data_algo_perf_results));
+		algo_max_count, &returnedAlgoCount, &bwd_data_algo_perf_results[0]));
+#endif
 	conv_bwd_data_algo_ = bwd_data_algo_perf_results[0].algo;
 #else
 	checkCudnnErrors(cudnnGetConvolutionBackwardDataAlgorithm(cuda_->cudnn(), 
@@ -637,18 +725,20 @@ void Conv2D::set_workspace()
 	checkCudnnErrors(cudnnGetConvolutionBackwardDataWorkspaceSize(cuda_->cudnn(),
 		filter_desc_, output_desc_, conv_desc_, input_desc_,
 		conv_bwd_data_algo_, &temp_size));
-	workspace_size = std::max(workspace_size, temp_size);
+	workspace_size_ = std::max(workspace_size_, temp_size);
 
-	if (workspace_size > 0)
+	if (workspace_size_ > 0)
 	{
-		if (d_workspace != nullptr)
-			checkCudaErrors(cudaFree(d_workspace));
-		checkCudaErrors(cudaMalloc((void**)&d_workspace, workspace_size));
+		if (d_workspace_ != nullptr)
+			checkCudaErrors(cudaFree(d_workspace_));
+		checkCudaErrors(cudaMalloc((void**)&d_workspace_, workspace_size_));
 	}
 }
 
-Blob<float> *Conv2D::forward(Blob<float> *input)
+bool Conv2D::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	// initialize weights and bias
 	if (weights_ == nullptr)
 	{
@@ -660,6 +750,8 @@ Blob<float> *Conv2D::forward(Blob<float> *input)
 		weights_ = new Blob<float>(out_channels_, input->c(), kernel_size_, kernel_size_);
 		biases_  = new Blob<float>(1, out_channels_);	// bias size
 		bias_desc_ = biases_->tensor();
+
+		is_initialize = true;
 	}
  
 	// initilaize input and output
@@ -702,11 +794,18 @@ Blob<float> *Conv2D::forward(Blob<float> *input)
 		{
 			/* do nothing */
 		}
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Conv2D::forward(Blob<float> *input)
+{
 	checkCudnnErrors(cudnnConvolutionForward(cuda_->cudnn(),
-		&cuda_->one, input_desc_, input_->cuda(),
-		filter_desc_, weights_->cuda(), conv_desc_, conv_fwd_algo_, d_workspace, workspace_size,
+		&cuda_->one,  input_desc_,  input_->cuda(),
+		filter_desc_, weights_->cuda(), conv_desc_, conv_fwd_algo_, d_workspace_,  workspace_size_,
 		&cuda_->zero, output_desc_, output_->cuda()));
 
 	checkCudnnErrors(cudnnAddTensor(cuda_->cudnn(), 
@@ -723,8 +822,10 @@ Blob<float> *Conv2D::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Conv2D::backward(Blob<float> *grad_output)
+bool Conv2D::bwd_initialize(Blob<float> *grad_output)
 {
+	bool is_initialize = false;
+
 	// initialize grad_output back-propagation space
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n()) {
 		grad_output_  = grad_output;
@@ -735,8 +836,15 @@ Blob<float> *Conv2D::backward(Blob<float> *grad_output)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
 			grad_input_->reset(input_->shape());
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Conv2D::backward(Blob<float> *grad_output)
+{
 	// gradients of biases
 	checkCudnnErrors(
 		cudnnConvolutionBackwardBias(cuda_->cudnn(),
@@ -751,7 +859,7 @@ Blob<float> *Conv2D::backward(Blob<float> *grad_output)
 			&cuda_->one, 
 			input_desc_, input_->cuda(), 
 			output_desc_, grad_output_->cuda(),
-			conv_desc_, conv_bwd_filter_algo_, d_workspace, workspace_size,
+			conv_desc_, conv_bwd_filter_algo_, d_workspace_, workspace_size_,
 			&cuda_->zero, 
 			filter_desc_, grad_weights_->cuda()));
 
@@ -762,7 +870,7 @@ Blob<float> *Conv2D::backward(Blob<float> *grad_output)
 				&cuda_->one, 
 				filter_desc_, weights_->cuda(), 
 				output_desc_, grad_output->cuda(), 
-				conv_desc_, conv_bwd_data_algo_, d_workspace, workspace_size,
+				conv_desc_, conv_bwd_data_algo_, d_workspace_, workspace_size_,
 				&cuda_->zero, 
 				input_desc_, grad_input_->cuda()));
 
@@ -809,8 +917,10 @@ Pooling::~Pooling()
 	cudnnDestroyPoolingDescriptor(pool_desc_);
 }
 
-Blob<float> *Pooling::forward(Blob<float> *input)
+bool Pooling::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -828,8 +938,15 @@ Blob<float> *Pooling::forward(Blob<float> *input)
 			output_->reset(output_size_);
 		
 		output_desc_ = output_->tensor();
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Pooling::forward(Blob<float> *input)
+{
 	cudnnPoolingForward(cuda_->cudnn(), pool_desc_,
 		&cuda_->one,   input_desc_,  input_->cuda(),
 		&cuda_->zero,  output_desc_, output_->cuda());
@@ -837,8 +954,10 @@ Blob<float> *Pooling::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Pooling::backward(Blob<float> *grad_output)
+bool Pooling::bwd_initialize(Blob<float> *grad_output)
 {
+	bool is_initialize = false;
+
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
 	{
 		grad_output_ = grad_output;
@@ -847,8 +966,15 @@ Blob<float> *Pooling::backward(Blob<float> *grad_output)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
 			grad_input_->reset(input_->shape());
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Pooling::backward(Blob<float> *grad_output)
+{
 	checkCudnnErrors(
 		cudnnPoolingBackward(cuda_->cudnn(), pool_desc_,
 			&cuda_->one,  
@@ -860,3 +986,4 @@ Blob<float> *Pooling::backward(Blob<float> *grad_output)
 
 	return grad_input_;
 }
+

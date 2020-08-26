@@ -28,13 +28,13 @@ Layer::~Layer()
 	std::cout << "Destroy Layer: " << name_ << std::endl;
 #endif
 
-	if (output_       != nullptr)  delete output_;
-	if (grad_input_   != nullptr)  delete grad_input_;
+	if (output_       != nullptr) { delete output_;       output_       = nullptr; }
+	if (grad_input_   != nullptr) { delete grad_input_;   grad_input_   = nullptr; }
 
-	if (weights_      != nullptr)  delete weights_;
-	if (biases_       != nullptr)  delete biases_;
-	if (grad_weights_ != nullptr)  delete grad_weights_;
-	if (grad_biases_  != nullptr)  delete grad_biases_;
+	if (weights_      != nullptr) { delete weights_;      weights_	    = nullptr; }
+	if (biases_       != nullptr) { delete biases_;	      biases_       = nullptr; }
+	if (grad_weights_ != nullptr) { delete grad_weights_; grad_weights_ = nullptr; }
+	if (grad_biases_  != nullptr) { delete grad_biases_;  grad_biases_  = nullptr; }
 }
 
 void Layer::init_weight_bias(unsigned int seed)
@@ -179,8 +179,7 @@ Dense::Dense(std::string name, int output_size)
 
 Dense::~Dense()
 {
-	if (d_one_vec != nullptr) 
-		cudaFree(d_one_vec);
+	if (d_one_vec != nullptr) { cudaFree(d_one_vec); d_one_vec = nullptr; }
 }
 
 __global__ void init_one_vec(float* d_one_vec, size_t length)
@@ -192,8 +191,10 @@ __global__ void init_one_vec(float* d_one_vec, size_t length)
 	d_one_vec[i] = 1.f;
 }
 
-Blob<float> *Dense::forward(Blob<float> *input)
+bool Dense::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	// initialize weights and biases
 	if (weights_ == nullptr)
 	{
@@ -204,6 +205,7 @@ Blob<float> *Dense::forward(Blob<float> *input)
 		weights_ = new Blob<float>(1, 1, input_size_, output_size_);
 		biases_  = new Blob<float>(1, 1, output_size_);
 
+		is_initialize = true;
 	}
 
 	// initilaize input and output
@@ -241,9 +243,15 @@ Blob<float> *Dense::forward(Blob<float> *input)
 		{
 			/* do nothing */
 		}
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
 
+Blob<float> *Dense::forward(Blob<float> *input)
+{
 	// output = weights^T * input (without biases)
 	checkCublasErrors(
 		cublasSgemm(cuda_->cublas(),
@@ -275,12 +283,16 @@ Blob<float> *Dense::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Dense::backward(Blob<float> *grad_output)
+bool Dense::bwd_initialize(Blob<float> *grad_output)
 {
+	bool is_initialize = false;
+
 	if (grad_weights_ == nullptr)
 	{
 		grad_weights_ = new Blob<float>(weights_->shape());
 		grad_biases_  = new Blob<float>(biases_->shape());
+
+		is_initialize = true;
 	}
 
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
@@ -291,8 +303,15 @@ Blob<float> *Dense::backward(Blob<float> *grad_output)
 			grad_input_   = new Blob<float>(input_->shape());
 		else
 			grad_input_->reset(input_->shape());
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Dense::backward(Blob<float> *grad_output)
+{
 	// db = (dy) * d_one_vec
 	cublasSgemv(cuda_->cublas(),
 			CUBLAS_OP_N,
@@ -343,11 +362,11 @@ Blob<float> *Dense::backward(Blob<float> *grad_output)
 Activation::Activation(std::string name, cudnnActivationMode_t mode, float coef)
 {
 	name_ = name;
-	mode_ = mode;
-	coef_ = coef;
+	act_mode_ = mode;
+	act_coef_ = coef;
 
 	cudnnCreateActivationDescriptor(&act_desc_);
-	cudnnSetActivationDescriptor(act_desc_, mode, CUDNN_PROPAGATE_NAN, coef);
+	cudnnSetActivationDescriptor(act_desc_, act_mode_, CUDNN_PROPAGATE_NAN, act_coef_);
 }
 
 Activation::~Activation()
@@ -355,8 +374,10 @@ Activation::~Activation()
 	cudnnDestroyActivationDescriptor(act_desc_);
 }
 
-Blob<float> *Activation::forward(Blob<float> *input)
+bool Activation::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -369,8 +390,18 @@ Blob<float> *Activation::forward(Blob<float> *input)
 			output_->reset(input->shape());
 
 		output_desc_ = output_->tensor();
+
+		// input_->print( name_ + "::input", false);
+		// output_desc_->print( name_ + "::output", false);
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Activation::forward(Blob<float> *input)
+{
 	cudnnActivationForward(cuda_->cudnn(),
 		act_desc_,
 		&cuda_->one,
@@ -383,8 +414,10 @@ Blob<float> *Activation::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Activation::backward(Blob<float> *grad_output)
+bool Activation::bwd_initialize(Blob<float> *grad_output)
 {
+	bool is_initialize = false;
+
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
 	{
 		grad_output_ = grad_output;
@@ -392,9 +425,16 @@ Blob<float> *Activation::backward(Blob<float> *grad_output)
 		if (grad_input_ == nullptr)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
-			grad_input_->reset(input_->shape());		
+			grad_input_->reset(input_->shape());
+		
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Activation::backward(Blob<float> *grad_output)
+{
 	cudnnActivationBackward(cuda_->cudnn(),
 		act_desc_,
 		&cuda_->one, 
@@ -418,11 +458,13 @@ Softmax::Softmax(std::string name)
 
 Softmax::~Softmax()
 {
-
+	// do nothing
 }
 
-Blob<float> *Softmax::forward(Blob<float> *input)
+bool Softmax::fwd_initialize(Blob<float> *input)
 {
+	bool is_initialize = false;
+
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -435,8 +477,15 @@ Blob<float> *Softmax::forward(Blob<float> *input)
 			output_->reset(input->shape());		
 
 		output_desc_ = output_->tensor();
+
+		is_initialize = false;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Softmax::forward(Blob<float> *input)
+{
 #if (DEBUG_SOFTMAX & 0x01)
 	std::cout << name_ << "[FORWARD]" << std::endl;
 	input_->print(name_ + "::input", true, input->n());
@@ -454,9 +503,9 @@ Blob<float> *Softmax::forward(Blob<float> *input)
 	return output_;
 }
 
-Blob<float> *Softmax::backward(Blob<float> *target)
+bool Softmax::bwd_initialize(Blob<float> *target)
 {
-	checkCudaErrors(cudaDeviceSynchronize());
+	bool is_initialize = false;
 
 	if (grad_input_ == nullptr || batch_size_ != target->n())
 	{
@@ -464,8 +513,15 @@ Blob<float> *Softmax::backward(Blob<float> *target)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
 		 	grad_input_->reset(input_->shape());
+
+		is_initialize = true;
 	}
 
+	return is_initialize;
+}
+
+Blob<float> *Softmax::backward(Blob<float> *target)
+{
 	// set grad_input_ as predict
 	checkCudaErrors(cudaMemcpyAsync(grad_input_->cuda(), 
 		output_->cuda(), output_->buf_size(), 
