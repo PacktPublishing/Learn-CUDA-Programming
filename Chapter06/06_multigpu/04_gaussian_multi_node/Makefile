@@ -15,7 +15,7 @@ HOSTFILE ?= myHosts
 CFLAGS = -O3 $(PARAMS) -I$(CUDA_PATH)/include/ -I$(MPI_PATH)/include 
 INCLUDES = -I$(CUDA_PATH)/include/ -I$(CUDA_PATH)/samples/inc -I$(CUDA_PATH)/targets/x86_64-linux/include
 
-IS_CUDA_11:=$(shell echo `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0 | bc)
+IS_CUDA_11:=${shell expr `$(NVCC) --version | grep compilation | grep -Eo -m 1 '[0-9]+.[0-9]' | head -1` \>= 11.0}
 
 # Gencode argumentes
 SMS = 35 37 50 52 60 61 70 75
