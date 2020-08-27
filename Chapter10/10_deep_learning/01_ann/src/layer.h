@@ -36,8 +36,8 @@ public:
     void unfreeze() { freeze_ = false;}
 
 protected:
-    virtual bool fwd_initialize(Blob<float> *input) = 0;
-    virtual bool bwd_initialize(Blob<float> *grad_output) = 0;
+    virtual void fwd_initialize(Blob<float> *input) = 0;
+    virtual void bwd_initialize(Blob<float> *grad_output) = 0;
 
     // name of layer
     std::string name_;
@@ -92,8 +92,8 @@ class Dense: public Layer
     virtual Blob<float> *backward(Blob<float> *grad_input);
 
     private:
-    bool fwd_initialize(Blob<float> *input);
-    bool bwd_initialize(Blob<float> *grad_output);
+    void fwd_initialize(Blob<float> *input);
+    void bwd_initialize(Blob<float> *grad_output);
 
     int input_size_ = 0;
     int output_size_= 0;
@@ -111,8 +111,8 @@ class Activation: public Layer
     virtual Blob<float> *backward(Blob<float> *grad_input);
 
     private:
-    bool fwd_initialize(Blob<float> *input);
-    bool bwd_initialize(Blob<float> *grad_output);
+    void fwd_initialize(Blob<float> *input);
+    void bwd_initialize(Blob<float> *grad_output);
 
     cudnnActivationDescriptor_t act_desc_;
     cudnnActivationMode_t       act_mode_;
@@ -132,8 +132,8 @@ class Softmax: public Layer
     int   get_accuracy(Blob<float> *target);
 
     protected:
-    bool fwd_initialize(Blob<float> *input);
-    bool bwd_initialize(Blob<float> *grad_output);
+    void fwd_initialize(Blob<float> *input);
+    void bwd_initialize(Blob<float> *grad_output);
 
     CrossEntropyLoss loss_;
 };

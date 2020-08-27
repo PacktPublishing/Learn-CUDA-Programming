@@ -191,10 +191,8 @@ __global__ void init_one_vec(float* d_one_vec, size_t length)
 	d_one_vec[i] = 1.f;
 }
 
-bool Dense::fwd_initialize(Blob<float> *input)
+void Dense::fwd_initialize(Blob<float> *input)
 {
-	bool is_initialize = false;
-
 	// initialize weights and biases
 	if (weights_ == nullptr)
 	{
@@ -204,8 +202,6 @@ bool Dense::fwd_initialize(Blob<float> *input)
 		// initialize weight, bias, and output
 		weights_ = new Blob<float>(1, 1, input_size_, output_size_);
 		biases_  = new Blob<float>(1, 1, output_size_);
-
-		is_initialize = true;
 	}
 
 	// initilaize input and output
@@ -243,11 +239,7 @@ bool Dense::fwd_initialize(Blob<float> *input)
 		{
 			/* do nothing */
 		}
-
-		is_initialize = true;
 	}
-
-	return is_initialize;
 }
 
 Blob<float> *Dense::forward(Blob<float> *input)
@@ -283,16 +275,12 @@ Blob<float> *Dense::forward(Blob<float> *input)
 	return output_;
 }
 
-bool Dense::bwd_initialize(Blob<float> *grad_output)
+void Dense::bwd_initialize(Blob<float> *grad_output)
 {
-	bool is_initialize = false;
-
 	if (grad_weights_ == nullptr)
 	{
 		grad_weights_ = new Blob<float>(weights_->shape());
 		grad_biases_  = new Blob<float>(biases_->shape());
-
-		is_initialize = true;
 	}
 
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
@@ -303,11 +291,7 @@ bool Dense::bwd_initialize(Blob<float> *grad_output)
 			grad_input_   = new Blob<float>(input_->shape());
 		else
 			grad_input_->reset(input_->shape());
-
-		is_initialize = true;
 	}
-
-	return is_initialize;
 }
 
 Blob<float> *Dense::backward(Blob<float> *grad_output)
@@ -374,10 +358,8 @@ Activation::~Activation()
 	cudnnDestroyActivationDescriptor(act_desc_);
 }
 
-bool Activation::fwd_initialize(Blob<float> *input)
+void Activation::fwd_initialize(Blob<float> *input)
 {
-	bool is_initialize = false;
-
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -390,14 +372,7 @@ bool Activation::fwd_initialize(Blob<float> *input)
 			output_->reset(input->shape());
 
 		output_desc_ = output_->tensor();
-
-		// input_->print( name_ + "::input", false);
-		// output_desc_->print( name_ + "::output", false);
-
-		is_initialize = true;
 	}
-
-	return is_initialize;
 }
 
 Blob<float> *Activation::forward(Blob<float> *input)
@@ -414,10 +389,8 @@ Blob<float> *Activation::forward(Blob<float> *input)
 	return output_;
 }
 
-bool Activation::bwd_initialize(Blob<float> *grad_output)
+void Activation::bwd_initialize(Blob<float> *grad_output)
 {
-	bool is_initialize = false;
-
 	if (grad_input_ == nullptr || batch_size_ != grad_output->n())
 	{
 		grad_output_ = grad_output;
@@ -426,11 +399,7 @@ bool Activation::bwd_initialize(Blob<float> *grad_output)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
 			grad_input_->reset(input_->shape());
-		
-		is_initialize = true;
 	}
-
-	return is_initialize;
 }
 
 Blob<float> *Activation::backward(Blob<float> *grad_output)
@@ -461,10 +430,8 @@ Softmax::~Softmax()
 	// do nothing
 }
 
-bool Softmax::fwd_initialize(Blob<float> *input)
+void Softmax::fwd_initialize(Blob<float> *input)
 {
-	bool is_initialize = false;
-
 	if (input_ == nullptr || batch_size_ != input->n())
 	{
 		input_ = input;
@@ -477,11 +444,7 @@ bool Softmax::fwd_initialize(Blob<float> *input)
 			output_->reset(input->shape());		
 
 		output_desc_ = output_->tensor();
-
-		is_initialize = false;
 	}
-
-	return is_initialize;
 }
 
 Blob<float> *Softmax::forward(Blob<float> *input)
@@ -503,21 +466,15 @@ Blob<float> *Softmax::forward(Blob<float> *input)
 	return output_;
 }
 
-bool Softmax::bwd_initialize(Blob<float> *target)
+void Softmax::bwd_initialize(Blob<float> *target)
 {
-	bool is_initialize = false;
-
 	if (grad_input_ == nullptr || batch_size_ != target->n())
 	{
 		if (grad_input_ == nullptr)
 			grad_input_ = new Blob<float>(input_->shape());
 		else
 		 	grad_input_->reset(input_->shape());
-
-		is_initialize = true;
 	}
-
-	return is_initialize;
 }
 
 Blob<float> *Softmax::backward(Blob<float> *target)
