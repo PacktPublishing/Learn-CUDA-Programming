@@ -44,7 +44,7 @@ __global__ void sgemm_kernel_v2(const float *A, const float *B, float *C, int M,
     for (int k = 0; k < K; k += BLOCK_DIM)
     {
         s_tile_A[tid_y][tid_x] = A[ (bid_y + tid_y) * K + tid_x + k ]; // Get sub-matrix from A
-        s_tile_B[tid_y][tid_x] = B[ (k*BLOCK_DIM + tid_y) * N + bid_x + tid_x ]; // Get sub-matrix from B
+        s_tile_B[tid_y][tid_x] = B[ (k + tid_y) * N + bid_x + tid_x ]; // Get sub-matrix from B
 
         __syncthreads();
 
@@ -122,7 +122,7 @@ int main(int c, char *argv[])
 
     // copy initial value for gpu memory
     cudaMemcpy(d_A, A, M * K * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_B, A, K * N * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, K * N * sizeof(float), cudaMemcpyHostToDevice);
 
     // do operation
     dim3 blockDim(BLOCK_DIM, BLOCK_DIM);
