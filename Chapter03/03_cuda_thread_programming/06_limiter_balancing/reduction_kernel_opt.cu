@@ -52,7 +52,7 @@ int reduction(float *g_outPtr, float *g_inPtr, int size, int n_threads)
     int n_blocks = min(num_blocks_per_sm * num_sms, (size + n_threads - 1) / n_threads);
 
     reduction_kernel<<<n_blocks, n_threads, n_threads * sizeof(float), 0>>>(g_outPtr, g_inPtr, size);
-    reduction_kernel<<<1, n_threads, n_threads * sizeof(float), 0>>>(g_outPtr, g_inPtr, n_blocks);
+    reduction_kernel<<<1, n_threads, n_threads * sizeof(float), 0>>>(g_outPtr, g_outPtr, n_blocks);
 
     return 1;
 }
